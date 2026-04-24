@@ -27,41 +27,60 @@ Results are merged by `shot_number` and exported as **GeoPackage** (`.gpkg`) and
 
 ## Key Features
 
-- 🌍 **Area of Interest** — use any polygon vector layer loaded in QGIS (or load a file directly).
-- 📅 **Date range & recurring months** — filter data by date and optionally by specific months.
-- 🔦 **Beam selection** — choose power beams, coverage beams, or all beams.
-- ✅ **Variable selection** — pick exactly which GEDI variables you need (L2A, L2B, L4A).
-- 🔧 **Quality filters** — apply quality flags before exporting.
-- 💾 **Output formats** — GeoPackage and/or GeoParquet.
-- 🔐 **NASA EarthData credentials** — enter once with optional persistent login.
-- 📋 **Live log panel** — follow the pipeline progress inside the QGIS dialog.
-- ❌ **Cancel button** — stop a running job at any time.
-- 🔄 **Auto-load results** — output layers are loaded automatically into the QGIS canvas.
+- 🌍 **Area of Interest** — use any polygon vector layer loaded in QGIS (or load a file directly)
+- 📅 **Date range & recurring months** — filter data by date and optionally by specific months
+- 🔦 **Beam selection** — choose power beams, coverage beams, or all beams
+- ✅ **Variable selection** — pick exactly which GEDI variables you need (L2A, L2B, L4A)
+- 🔧 **Quality filters** — apply quality flags before exporting
+- 💾 **Output formats** — GeoPackage and/or GeoParquet
+- 🔐 **NASA EarthData credentials** — enter once with optional persistent login
+- 📋 **Live log panel** — follow the pipeline progress inside the QGIS dialog
+- ❌ **Cancel button** — stop a running job at any time
+- 🔄 **Auto-load results** — output layers load automatically into the QGIS canvas
 
 ---
 
 ## Requirements
 
-- QGIS 3.x or 4.x
+- QGIS 3.x or 4.x installed via **OSGeo4W** (recommended for Windows)
 - NASA EarthData account → [Register here](https://urs.earthdata.nasa.gov/)
-- Python dependencies (available to QGIS Python environment):
-  - `h5py` `pandas` `geopandas` `shapely` `fiona` `rtree` `numpy` `requests`
+- Python dependencies: `h5py` `pandas` `geopandas` `shapely` `fiona` `rtree` `numpy` `requests`
 
-### Installing dependencies
+---
 
-**Windows (OSGeo4W Shell):**
-```cmd
-python -m pip install h5py pandas geopandas shapely fiona rtree requests
-```
-> If you get HDF5 mismatch errors with `h5py`, use OSGeo4W Setup (Advanced) to install `python3-h5py` instead.
+## Installing dependencies
 
-**Linux (Debian/Ubuntu):**
+### Windows — OSGeo4W (recommended)
+
+The easiest and most reliable method on Windows is to install QGIS through
+**OSGeo4W** and select the Python packages during setup:
+
+1. Download **OSGeo4W installer** from [https://trac.osgeo.org/osgeo4w/](https://trac.osgeo.org/osgeo4w/)
+2. Run it → choose **Advanced Install**
+3. On the **Select Packages** screen, search and mark for install:
+   - `python3-h5py`
+   - `python3-pandas`
+   - `python3-geopandas`
+   - `python3-shapely`
+   - `python3-requests`
+   - `python3-fiona`
+4. Complete the installation — QGIS and all dependencies will be ready
+
+> **Alternative:** From the OSGeo4W Shell (if QGIS is already installed):
+> ```cmd
+> python -m pip install --user pandas geopandas shapely fiona requests
+> ```
+> For `h5py`, prefer the OSGeo4W package `python3-h5py` to avoid HDF5 version conflicts.
+
+### Linux — Debian / Ubuntu
+
 ```bash
 sudo apt install python3-h5py python3-pandas python3-geopandas \
-                 python3-shapely python3-rtree python3-requests
+                 python3-shapely python3-fiona python3-rtree python3-requests
 ```
 
-**macOS:**
+### macOS
+
 ```bash
 pip install h5py pandas geopandas shapely fiona rtree requests
 ```
@@ -70,25 +89,25 @@ pip install h5py pandas geopandas shapely fiona rtree requests
 
 ## Installation
 
-1. Download the latest ZIP from the [Releases](https://github.com/AlexanderCotrinaS/gedi-metrics-qgis/releases) page.
+1. Download the latest ZIP from the [Releases](https://github.com/AlexanderCotrinaS/gedi-metrics-qgis/releases) page
 2. Open QGIS → **Plugins** → **Manage and Install Plugins…**
-3. Click **Install from ZIP** → select the downloaded file.
-4. Enable the plugin and restart QGIS.
+3. Click **Install from ZIP** → select the downloaded file
+4. Enable the plugin and restart QGIS
 
 ---
 
 ## Usage
 
-1. Open the plugin from the **Plugins** menu or the toolbar button.
-2. Select your **output folder**.
-3. Choose **products** (L2A, L2B, L4A) and **version**.
-4. Set the **date range** and optionally filter by recurring months.
-5. Select a **polygon layer** as your area of interest (ROI).
-6. Enter your **NASA EarthData credentials** (optionally save them).
-7. Choose **beams**, **variables**, and **quality filters**.
-8. Select **output formats** (GeoPackage / GeoParquet).
-9. Click **Run** — progress appears in the log panel.
-10. Results load automatically into QGIS when done.
+1. Open the plugin from the **Plugins** menu or the toolbar button
+2. Select your **output folder**
+3. Choose **products** (L2A, L2B, L4A) and **version**
+4. Set the **date range** and optionally filter by recurring months
+5. Select a **polygon layer** as your area of interest (ROI)
+6. Enter your **NASA EarthData credentials** (optionally save them)
+7. Choose **beams**, **variables**, and **quality filters**
+8. Select **output formats** (GeoPackage / GeoParquet)
+9. Click **Run** — progress appears in the log panel
+10. Results load automatically into QGIS when done
 
 ---
 
@@ -128,8 +147,8 @@ This plugin builds on the [GEDI-Pipeline](https://github.com/leonelluiscorado/GE
 
 ## License
 
-This project is licensed under the **GNU General Public License v2.0**.  
-See the [LICENSE](LICENSE) file for details.
+This project is licensed under the **GNU General Public License v2.0**.
+See the [LICENSE](gedi_metrics/LICENSE) file for details.
 
 ---
 
