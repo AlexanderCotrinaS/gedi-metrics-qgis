@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Windows metadata
+*.Zone.Identifier
+*:Zone.Identifier
+Thumbs.db
+desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# QGIS
+*.qgz~
+*.qgs~
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs & temp
+*.log
+*.tmp
+.env
+
+# Large data files (no subir datos GEDI)
+*.h5
+*.HDF5
+*.gpkg
+*.parquet
+*.geojson
+*.shp
+*.dbf
+*.shx
+*.prj

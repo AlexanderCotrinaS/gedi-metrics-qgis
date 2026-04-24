@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>GEDIMetricsDialogBase</class>
+ <widget class="QDialog" name="GEDIMetricsDialogBase">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>620</width><height>780</height></rect>
+  </property>
+  <property name="windowTitle">
+   <string>GEDIMetrics</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainVerticalLayout">
+   <item>
+    <widget class="QTabWidget" name="tabWidget">
+     <property name="currentIndex"><number>0</number></property>
+
+     <!-- TAB 1: GENERAL -->
+     <widget class="QWidget" name="tab_general">
+      <attribute name="title"><string>General</string></attribute>
+      <layout class="QVBoxLayout" name="verticalLayoutGeneral">
+       <item>
+        <widget class="QGroupBox" name="outputGroup">
+         <property name="title"><string>Output</string></property>
+         <layout class="QFormLayout" name="formLayoutOutput">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_output_dir"><property name="text"><string>Output folder:</string></property></widget>
+          </item>
+          <item row="0" column="1">
+           <layout class="QHBoxLayout" name="horizontalLayoutOutput">
+            <item><widget class="QLineEdit" name="output_dir_lineedit"/></item>
+            <item><widget class="QPushButton" name="browse_output_btn"><property name="text"><string>Browse...</string></property></widget></item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="productGroup">
+         <property name="title"><string>GEDI Products</string></property>
+         <layout class="QVBoxLayout" name="vLayoutProducts">
+          <item>
+           <widget class="QLabel" name="label_products_hint">
+            <property name="text"><string>Select one or more products to download and merge:</string></property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutProductChecks">
+            <item><widget class="QCheckBox" name="check_l2a"><property name="text"><string>L2A - Canopy Height</string></property><property name="checked"><bool>true</bool></property></widget></item>
+            <item><widget class="QCheckBox" name="check_l2b"><property name="text"><string>L2B - Canopy Cover</string></property></widget></item>
+            <item><widget class="QCheckBox" name="check_l4a"><property name="text"><string>L4A - Biomass</string></property></widget></item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QFormLayout" name="formLayoutVersion">
+            <item row="0" column="0"><widget class="QLabel" name="label_version"><property name="text"><string>Version:</string></property></widget></item>
+            <item row="0" column="1"><widget class="QComboBox" name="version_combo"><item><property name="text"><string>002</string></property></item></widget></item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="datesGroup">
+         <property name="title"><string>Date range</string></property>
+         <layout class="QFormLayout" name="formLayoutDates">
+          <item row="0" column="0"><widget class="QLabel" name="label_start_date"><property name="text"><string>Start date (yyyy.MM.dd):</string></property></widget></item>
+          <item row="0" column="1">
+           <widget class="QDateEdit" name="start_date_edit">
+            <property name="dateTime"><datetime><hour>0</hour><minute>0</minute><second>0</second><year>2019</year><month>3</month><day>25</day></datetime></property>
+            <property name="displayFormat"><string>yyyy.MM.dd</string></property>
+            <property name="calendarPopup"><bool>true</bool></property>
+           </widget>
+          </item>
+          <item row="1" column="0"><widget class="QLabel" name="label_end_date"><property name="text"><string>End date (yyyy.MM.dd):</string></property></widget></item>
+          <item row="1" column="1">
+           <widget class="QDateEdit" name="end_date_edit">
+            <property name="displayFormat"><string>yyyy.MM.dd</string></property>
+            <property name="calendarPopup"><bool>true</bool></property>
+            <property name="date"><date><year>2026</year><month>1</month><day>1</day></date></property>
+           </widget>
+          </item>
+          <item row="2" column="1"><widget class="QCheckBox" name="recurring_months_check"><property name="text"><string>Recurring months only</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="roiGroup">
+         <property name="title"><string>Area of Interest (Polygon Layer)</string></property>
+         <layout class="QFormLayout" name="formLayoutROI">
+          <item row="0" column="0"><widget class="QLabel" name="label_polygon_layer"><property name="text"><string>Polygon layer:</string></property></widget></item>
+          <item row="0" column="1">
+           <layout class="QHBoxLayout" name="horizontalLayoutPolygonPicker">
+            <item><widget class="QComboBox" name="polygon_layer_combo"/></item>
+            <item>
+             <widget class="QToolButton" name="polygon_options_btn">
+              <property name="maximumSize"><size><width>32</width><height>16777215</height></size></property>
+              <property name="text"><string>...</string></property>
+              <property name="popupMode"><enum>QToolButton::InstantPopup</enum></property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="1" column="1"><widget class="QCheckBox" name="selected_only_check"><property name="text"><string>Selected features only</string></property></widget></item>
+          <item row="2" column="0"><widget class="QLabel" name="label_polygon_source"><property name="text"><string>Source:</string></property></widget></item>
+          <item row="2" column="1"><widget class="QLineEdit" name="polygon_path_lineedit"><property name="readOnly"><bool>true</bool></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item><spacer name="verticalSpacerGeneral"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
+      </layout>
+     </widget>
+
+     <!-- TAB 2: VARIABLES -->
+     <widget class="QWidget" name="tab_variables">
+      <attribute name="title"><string>Variables</string></attribute>
+      <layout class="QVBoxLayout" name="vLayoutVariables">
+       <item>
+        <widget class="QLabel" name="label_vars_hint">
+         <property name="text"><string>Select variables to extract per product. Base fields (shot_number, lat, lon, beam, delta_time) are always included.</string></property>
+         <property name="wordWrap"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTabWidget" name="tabWidgetVars">
+         <property name="currentIndex"><number>0</number></property>
+
+         <!-- Sub-tab L2A -->
+         <widget class="QWidget" name="tab_vars_l2a">
+          <attribute name="title"><string>L2A - Height</string></attribute>
+          <layout class="QVBoxLayout" name="vLayoutL2AVars">
+           <item>
+            <layout class="QHBoxLayout">
+             <item><widget class="QPushButton" name="btn_l2a_all"><property name="text"><string>Select all</string></property><property name="maximumWidth"><number>100</number></property></widget></item>
+             <item><widget class="QPushButton" name="btn_l2a_none"><property name="text"><string>Clear</string></property><property name="maximumWidth"><number>100</number></property></widget></item>
+             <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="grp_l2a_rh">
+             <property name="title"><string>Relative Height (rh) percentiles</string></property>
+             <layout class="QGridLayout" name="gridL2ARH">
+              <item row="0" column="0"><widget class="QCheckBox" name="chk_l2a_rh10"><property name="text"><string>rh10</string></property></widget></item>
+              <item row="0" column="1"><widget class="QCheckBox" name="chk_l2a_rh20"><property name="text"><string>rh20</string></property></widget></item>
+              <item row="0" column="2"><widget class="QCheckBox" name="chk_l2a_rh25"><property name="text"><string>rh25</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="0" column="3"><widget class="QCheckBox" name="chk_l2a_rh30"><property name="text"><string>rh30</string></property></widget></item>
+              <item row="1" column="0"><widget class="QCheckBox" name="chk_l2a_rh40"><property name="text"><string>rh40</string></property></widget></item>
+              <item row="1" column="1"><widget class="QCheckBox" name="chk_l2a_rh50"><property name="text"><string>rh50</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="1" column="2"><widget class="QCheckBox" name="chk_l2a_rh60"><property name="text"><string>rh60</string></property></widget></item>
+              <item row="1" column="3"><widget class="QCheckBox" name="chk_l2a_rh70"><property name="text"><string>rh70</string></property></widget></item>
+              <item row="2" column="0"><widget class="QCheckBox" name="chk_l2a_rh75"><property name="text"><string>rh75</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="2" column="1"><widget class="QCheckBox" name="chk_l2a_rh80"><property name="text"><string>rh80</string></property></widget></item>
+              <item row="2" column="2"><widget class="QCheckBox" name="chk_l2a_rh95"><property name="text"><string>rh95</string></property></widget></item>
+              <item row="2" column="3"><widget class="QCheckBox" name="chk_l2a_rh98"><property name="text"><string>rh98</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="3" column="0"><widget class="QCheckBox" name="chk_l2a_rh100"><property name="text"><string>rh100</string></property></widget></item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="grp_l2a_other">
+             <property name="title"><string>Other variables</string></property>
+             <layout class="QGridLayout" name="gridL2AOther">
+              <item row="0" column="0"><widget class="QCheckBox" name="chk_l2a_elev_lowestmode"><property name="text"><string>elev_lowestmode</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="0" column="1"><widget class="QCheckBox" name="chk_l2a_elev_highestreturn"><property name="text"><string>elev_highestreturn</string></property></widget></item>
+              <item row="1" column="0"><widget class="QCheckBox" name="chk_l2a_sensitivity"><property name="text"><string>sensitivity</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="1" column="1"><widget class="QCheckBox" name="chk_l2a_solar_elevation"><property name="text"><string>solar_elevation</string></property></widget></item>
+              <item row="2" column="0"><widget class="QCheckBox" name="chk_l2a_dem"><property name="text"><string>digital_elevation_model</string></property></widget></item>
+              <item row="2" column="1"><widget class="QCheckBox" name="chk_l2a_num_detectedmodes"><property name="text"><string>num_detectedmodes</string></property></widget></item>
+              <item row="3" column="0"><widget class="QCheckBox" name="chk_l2a_selected_algorithm"><property name="text"><string>selected_algorithm</string></property></widget></item>
+             </layout>
+            </widget>
+           </item>
+           <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
+          </layout>
+         </widget>
+
+         <!-- Sub-tab L2B -->
+         <widget class="QWidget" name="tab_vars_l2b">
+          <attribute name="title"><string>L2B - Cover</string></attribute>
+          <layout class="QVBoxLayout" name="vLayoutL2BVars">
+           <item>
+            <layout class="QHBoxLayout">
+             <item><widget class="QPushButton" name="btn_l2b_all"><property name="text"><string>Select all</string></property><property name="maximumWidth"><number>100</number></property></widget></item>
+             <item><widget class="QPushButton" name="btn_l2b_none"><property name="text"><string>Clear</string></property><property name="maximumWidth"><number>100</number></property></widget></item>
+             <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="grp_l2b_vars">
+             <property name="title"><string>L2B variables</string></property>
+             <layout class="QGridLayout" name="gridL2BVars">
+              <item row="0" column="0"><widget class="QCheckBox" name="chk_l2b_cover"><property name="text"><string>cover</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="0" column="1"><widget class="QCheckBox" name="chk_l2b_cover_z"><property name="text"><string>cover_z</string></property></widget></item>
+              <item row="1" column="0"><widget class="QCheckBox" name="chk_l2b_pai"><property name="text"><string>pai</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="1" column="1"><widget class="QCheckBox" name="chk_l2b_pai_z"><property name="text"><string>pai_z</string></property></widget></item>
+              <item row="2" column="0"><widget class="QCheckBox" name="chk_l2b_fhd_normal"><property name="text"><string>fhd_normal</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="2" column="1"><widget class="QCheckBox" name="chk_l2b_rh100"><property name="text"><string>rh100</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="3" column="0"><widget class="QCheckBox" name="chk_l2b_pavd_z"><property name="text"><string>pavd_z</string></property></widget></item>
+              <item row="3" column="1"><widget class="QCheckBox" name="chk_l2b_pgap_theta"><property name="text"><string>pgap_theta</string></property></widget></item>
+              <item row="4" column="0"><widget class="QCheckBox" name="chk_l2b_rhov"><property name="text"><string>rhov</string></property></widget></item>
+              <item row="4" column="1"><widget class="QCheckBox" name="chk_l2b_rhog"><property name="text"><string>rhog</string></property></widget></item>
+              <item row="5" column="0"><widget class="QCheckBox" name="chk_l2b_sensitivity"><property name="text"><string>sensitivity</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="5" column="1"><widget class="QCheckBox" name="chk_l2b_solar_elevation"><property name="text"><string>solar_elevation</string></property></widget></item>
+             </layout>
+            </widget>
+           </item>
+           <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
+          </layout>
+         </widget>
+
+         <!-- Sub-tab L4A -->
+         <widget class="QWidget" name="tab_vars_l4a">
+          <attribute name="title"><string>L4A - Biomass</string></attribute>
+          <layout class="QVBoxLayout" name="vLayoutL4AVars">
+           <item>
+            <layout class="QHBoxLayout">
+             <item><widget class="QPushButton" name="btn_l4a_all"><property name="text"><string>Select all</string></property><property name="maximumWidth"><number>100</number></property></widget></item>
+             <item><widget class="QPushButton" name="btn_l4a_none"><property name="text"><string>Clear</string></property><property name="maximumWidth"><number>100</number></property></widget></item>
+             <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="grp_l4a_vars">
+             <property name="title"><string>L4A variables</string></property>
+             <layout class="QGridLayout" name="gridL4AVars">
+              <item row="0" column="0"><widget class="QCheckBox" name="chk_l4a_agbd"><property name="text"><string>agbd</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="0" column="1"><widget class="QCheckBox" name="chk_l4a_agbd_se"><property name="text"><string>agbd_se</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="1" column="0"><widget class="QCheckBox" name="chk_l4a_agbd_t"><property name="text"><string>agbd_t</string></property></widget></item>
+              <item row="1" column="1"><widget class="QCheckBox" name="chk_l4a_agbd_t_se"><property name="text"><string>agbd_t_se</string></property></widget></item>
+              <item row="2" column="0"><widget class="QCheckBox" name="chk_l4a_sensitivity"><property name="text"><string>sensitivity</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="2" column="1"><widget class="QCheckBox" name="chk_l4a_solar_elevation"><property name="text"><string>solar_elevation</string></property></widget></item>
+              <item row="3" column="0"><widget class="QCheckBox" name="chk_l4a_elev_lowestmode"><property name="text"><string>elev_lowestmode</string></property></widget></item>
+              <item row="3" column="1"><widget class="QCheckBox" name="chk_l4a_num_detectedmodes"><property name="text"><string>num_detectedmodes</string></property></widget></item>
+              <item row="4" column="0"><widget class="QCheckBox" name="chk_l4a_selected_algorithm"><property name="text"><string>selected_algorithm</string></property></widget></item>
+             </layout>
+            </widget>
+           </item>
+           <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
+          </layout>
+         </widget>
+
+
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- TAB 3: FILTERS -->
+     <widget class="QWidget" name="tab_filters">
+      <attribute name="title"><string>Filters</string></attribute>
+      <layout class="QVBoxLayout" name="vLayoutFilters">
+       <item>
+        <widget class="QLabel" name="label_filters_hint">
+         <property name="text"><string>Filters are applied after subsetting. Footprints that do not pass are excluded from the output.</string></property>
+         <property name="wordWrap"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_quality">
+         <property name="title"><string>Quality flags</string></property>
+         <layout class="QFormLayout" name="formQuality">
+          <item row="0" column="0"><widget class="QLabel"><property name="text"><string>L2A quality_flag &gt;=</string></property></widget></item>
+          <item row="0" column="1"><widget class="QSpinBox" name="spin_l2a_quality"><property name="minimum"><number>0</number></property><property name="maximum"><number>1</number></property><property name="value"><number>1</number></property></widget></item>
+          <item row="1" column="0"><widget class="QLabel"><property name="text"><string>L2B l2b_quality_flag &gt;=</string></property></widget></item>
+          <item row="1" column="1"><widget class="QSpinBox" name="spin_l2b_quality"><property name="minimum"><number>0</number></property><property name="maximum"><number>1</number></property><property name="value"><number>1</number></property></widget></item>
+          <item row="2" column="0"><widget class="QLabel"><property name="text"><string>L4A l4_quality_flag &gt;=</string></property></widget></item>
+          <item row="2" column="1"><widget class="QSpinBox" name="spin_l4a_quality"><property name="minimum"><number>0</number></property><property name="maximum"><number>1</number></property><property name="value"><number>1</number></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_sensitivity">
+         <property name="title"><string>Sensitivity</string></property>
+         <layout class="QFormLayout" name="formSensitivity">
+          <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Min. sensitivity &gt;=</string></property></widget></item>
+          <item row="0" column="1">
+           <widget class="QDoubleSpinBox" name="spin_sensitivity">
+            <property name="minimum"><double>0.0</double></property>
+            <property name="maximum"><double>1.0</double></property>
+            <property name="singleStep"><double>0.01</double></property>
+            <property name="value"><double>0.90</double></property>
+           </widget>
+          </item>
+          <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Apply to:</string></property></widget></item>
+          <item row="1" column="1">
+           <layout class="QHBoxLayout">
+            <item><widget class="QCheckBox" name="chk_sens_l2a"><property name="text"><string>L2A</string></property><property name="checked"><bool>true</bool></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_sens_l2b"><property name="text"><string>L2B</string></property><property name="checked"><bool>true</bool></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_sens_l4a"><property name="text"><string>L4A</string></property><property name="checked"><bool>true</bool></property></widget></item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_degrade">
+         <property name="title"><string>Degrade flag</string></property>
+         <layout class="QVBoxLayout">
+          <item><widget class="QCheckBox" name="chk_exclude_degrade"><property name="text"><string>Exclude degraded footprints (degrade_flag = 1)</string></property><property name="checked"><bool>true</bool></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_surface">
+         <property name="title"><string>Surface type</string></property>
+         <layout class="QVBoxLayout">
+          <item><widget class="QLabel"><property name="text"><string>Keep only surface_flag =</string></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout">
+            <item><widget class="QCheckBox" name="chk_surf_land"><property name="text"><string>Land (1)</string></property><property name="checked"><bool>true</bool></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_surf_water"><property name="text"><string>Water (2)</string></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_surf_all"><property name="text"><string>All</string></property></widget></item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
+      </layout>
+     </widget>
+
+     <!-- TAB 4: OUTPUT -->
+     <widget class="QWidget" name="tab_output">
+      <attribute name="title"><string>Output</string></attribute>
+      <layout class="QVBoxLayout" name="vLayoutOutput">
+       <item>
+        <widget class="QGroupBox" name="grp_output_format">
+         <property name="title"><string>Output format</string></property>
+         <layout class="QVBoxLayout">
+          <item><widget class="QCheckBox" name="chk_out_gpkg"><property name="text"><string>GeoPackage (.gpkg) - for QGIS</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item><widget class="QCheckBox" name="chk_out_parquet"><property name="text"><string>GeoParquet (.parquet) - for Python analysis</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_merge">
+         <property name="title"><string>Multi-product merge (when 2+ products selected)</string></property>
+         <layout class="QVBoxLayout">
+          <item><widget class="QLabel" name="label_merge_hint"><property name="text"><string>How to join products by shot_number:</string></property></widget></item>
+          <item><widget class="QRadioButton" name="radio_merge_outer"><property name="text"><string>Outer join - keep all footprints, fill missing with NaN</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item><widget class="QRadioButton" name="radio_merge_inner"><property name="text"><string>Inner join - only footprints present in all products</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_beams">
+         <property name="title"><string>Beams</string></property>
+         <layout class="QVBoxLayout">
+          <item>
+           <widget class="QCheckBox" name="chk_full_power_only">
+            <property name="text"><string>Full power beams only (BEAM0101, BEAM0110, BEAM1000, BEAM1011) — recommended for dense forests</string></property>
+            <property name="checked"><bool>false</bool></property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QFormLayout">
+            <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Custom beams (comma-separated, overrides above):</string></property></widget></item>
+            <item row="0" column="1"><widget class="QLineEdit" name="beams_lineedit"><property name="placeholderText"><string>e.g. BEAM0101,BEAM1000  (empty = use checkbox above)</string></property></widget></item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_hdf5">
+         <property name="title"><string>HDF5 files</string></property>
+         <layout class="QVBoxLayout">
+          <item><widget class="QCheckBox" name="keep_original_check"><property name="text"><string>Keep original HDF5 files after processing</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
+      </layout>
+     </widget>
+
+     <!-- TAB 5: EARTHDATA -->
+     <widget class="QWidget" name="tab_credentials">
+      <attribute name="title"><string>EarthData</string></attribute>
+      <layout class="QVBoxLayout" name="verticalLayoutCredentials">
+       <item>
+        <widget class="QGroupBox" name="earthdataGroup">
+         <property name="title"><string>EarthData credentials</string></property>
+         <layout class="QFormLayout" name="formLayoutCredentials">
+          <item row="0" column="0"><widget class="QLabel" name="label_earthdata_user"><property name="text"><string>Username:</string></property></widget></item>
+          <item row="0" column="1"><widget class="QLineEdit" name="earthdata_user_edit"/></item>
+          <item row="1" column="0"><widget class="QLabel" name="label_earthdata_pass"><property name="text"><string>Password:</string></property></widget></item>
+          <item row="1" column="1"><widget class="QLineEdit" name="earthdata_pass_edit"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
+          <item row="2" column="1"><widget class="QCheckBox" name="keep_login_check"><property name="text"><string>Keep login (save netrc)</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item><spacer name="verticalSpacerCredentials"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
+      </layout>
+     </widget>
+
+    </widget>
+   </item>
+
+   <!-- Progress + log -->
+   <item>
+    <widget class="QGroupBox" name="progressGroup">
+     <property name="title"><string>Progress</string></property>
+     <layout class="QVBoxLayout" name="verticalLayoutProgress">
+      <item><widget class="QProgressBar" name="progress_bar"><property name="value"><number>0</number></property><property name="textVisible"><bool>true</bool></property></widget></item>
+      <item><widget class="QTextEdit" name="log_text_edit"><property name="readOnly"><bool>true</bool></property><property name="minimumHeight"><number>80</number></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- Buttons -->
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayoutButtons">
+     <item><spacer name="horizontalSpacerButtons"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="run_pipeline"><property name="text"><string>Run GEDIMetrics</string></property></widget></item>
+     <item><widget class="QPushButton" name="close_button"><property name="text"><string>Close</string></property></widget></item>
+    </layout>
+   </item>
+
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
