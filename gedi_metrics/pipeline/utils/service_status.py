@@ -17,7 +17,7 @@ def get_service_status(product):
     if product in ["GEDI04_A"]:
         link = 'https://status.earthdata.nasa.gov/api/v1/notifications?client=ORNL%20DAAC%20Website%20(OPS)&alll=true'
 
-    notifications_list = requests.get(link).json()['notifications']
+    notifications_list = requests.get(link, timeout=30).json()['notifications']
 
     if len(notifications_list) > 0:
         for notif in notifications_list:

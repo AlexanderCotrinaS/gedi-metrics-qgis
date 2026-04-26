@@ -3,9 +3,9 @@ name=GEDIMetrics
 qgisMinimumVersion=3.0
 qgisMaximumVersion=4.99
 description=Download, subset and merge GEDI products (L2A, L2B, L4A) into a single GeoPackage with selectable variables and filters.
-version=1.0.0
+version=1.0.1
 author=Alexander Cotrina-Sanchez
-email=alexander.cotrina@untrm.edu.pe
+email=alexander.cotrina.sanchez@gmail.com
 
 about=GEDIMetrics downloads GEDI LiDAR data from NASA EarthData, subsets it to a user-defined area of interest, merges multiple products (L2A canopy height, L2B canopy cover, L4A aboveground biomass) by shot_number, and exports the result as GeoPackage or GeoParquet with user-selected variables and quality filters. Compatible with QGIS 3.x and 4.x.
 

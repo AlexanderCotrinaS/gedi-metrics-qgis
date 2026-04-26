@@ -69,17 +69,17 @@ class GEDIFinder:
 
         try:
             # Send GET request to CMR granule search endpoint w/ product concept ID, bbox & page number, format return as json
-            cmr_response = r.get(f"{cmr}{concept_ids[product]}&bounding_box={bbox}&pageNum={page}").json()['feed']['entry']
+            cmr_response = r.get(f"{cmr}{concept_ids[product]}&bounding_box={bbox}&pageNum={page}", timeout=30).json()['feed']['entry']
             # If 2000 features are returned, move to the next page and submit another request, and append to the response
             while len(cmr_response) % 2000 == 0:
                 page += 1
-                cmr_response += r.get(f"{cmr}{concept_ids[product]}&bounding_box={bbox}&pageNum={page}").json()['feed']['entry']
+                cmr_response += r.get(f"{cmr}{concept_ids[product]}&bounding_box={bbox}&pageNum={page}", timeout=30).json()['feed']['entry']
             # CMR returns more info than just the Data Pool links, below use list comprehension to return a list of DP links
             return [(c['links'][0]['href'], c['granule_size']) for c in cmr_response if not ".png" in c['links'][0]['href']]
         except:
             # If the request did not complete successfully, print out the response from CMR
             print("[Finder] Request not successful.")
-            print(r.get(f"{cmr}{concept_ids[product]}&bounding_box={bbox.replace(' ', '')}&pageNum={page}").json())
+            print(r.get(f"{cmr}{concept_ids[product]}&bounding_box={bbox.replace(' ', '')}&pageNum={page}", timeout=30).json())
             exit(0)
 
 
