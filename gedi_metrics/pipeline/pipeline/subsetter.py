@@ -10,8 +10,9 @@ Cambios respecto al original:
      según los índices seleccionados — no se guarda como array completo.
   3. subset_to_gdf() devuelve un GeoDataFrame en lugar de escribir el archivo.
      El pipeline decide cuándo y cómo guardar (después del merge).
-  4. Se aplican los filtros (quality, sensitivity, degrade, surface)
-     sobre el GeoDataFrame antes de devolverlo.
+  4. Se aplican los filtros (quality, degrade, surface)
+     sobre el GeoDataFrame antes de devolverlo. Sensitivity se evalúa
+     después del merge para respetar joins multi-producto.
   5. Corrección del import relativo (utils).
 """
 
@@ -61,7 +62,43 @@ BASE_FIELDS = {
         'surface': '/surface_flag',
         'delta_time': '/delta_time',
     },
+    # L4C — Waveform Structural Complexity Index (WSCI).
+    # Uses wsci_quality_flag as primary quality column (stricter than l2_quality_flag:
+    # restricts to forested land cover with high sensitivity). l2_quality_flag is also
+    # present and is preserved as a secondary flag.
+    # surface_flag is extracted (it exists in L4C, inherited from L2A) but the
+    # surface filter is NOT applied for L4C: wsci_quality_flag already excludes
+    # water and urban surfaces by design.
+    'GEDI04_C': {
+        'lat':    '/lat_lowestmode',
+        'lon':    '/lon_lowestmode',
+        'shot':   '/shot_number',
+        'degrade': '/degrade_flag',
+        'quality': '/wsci_quality_flag',
+        'surface': '/surface_flag',
+        'delta_time': '/delta_time',
+    },
 
+}
+
+# Columnas reales de calidad por producto. Se mantienen separadas para evitar
+# filtrar GEDI04_A con el nombre generico quality_flag.
+QUALITY_COLUMN_NAMES = {
+    'GEDI02_A': 'quality_flag',
+    'GEDI02_B': 'l2b_quality_flag',
+    'GEDI04_A': 'l4_quality_flag',
+    'GEDI04_C': 'wsci_quality_flag',
+}
+
+# Flags de calidad secundarios que conviene conservar si existen, pero no se
+# usan como filtro principal salvo que el usuario los seleccione en variables.
+# GEDI04_A/l2_quality_flag se omite del output para mantener la tabla limpia;
+# el filtro principal de L4A queda representado por l4_quality_flag.
+# GEDI04_C: l2_quality_flag se conserva como flag secundario para que el usuario
+# pueda compararlo con wsci_quality_flag (que es estricto sobre cobertura forestal).
+SECONDARY_QUALITY_FIELDS = {
+    'GEDI02_B': {'l2a_quality_flag': '/l2a_quality_flag'},
+    'GEDI04_C': {'l2_quality_flag':  '/l2_quality_flag'},
 }
 
 ALL_BEAMS = [
@@ -235,22 +272,31 @@ class GEDISubsetter:
             'longitude':   lons[mindex:maxdex][mask[mindex:maxdex]],
         })
 
-        # Campos base adicionales (delta_time, quality, degrade, surface)
+        # Campos base adicionales (delta_time, quality, degrade, surface).
+        # La calidad usa el nombre real del producto:
+        # GEDI02_A=quality_flag, GEDI02_B=l2b_quality_flag, GEDI04_A=l4_quality_flag.
+        quality_col = QUALITY_COLUMN_NAMES.get(self.product, 'quality_flag')
         for col_name, path in [
             ('delta_time',   dtime_path),
-            ('quality_flag', qual_path),
+            (quality_col,    qual_path),
             ('degrade_flag', deg_path),
             ('surface_flag', surf_path),
         ]:
             full_path = path if path.startswith(beam) else f"{beam}{path.lstrip('/')}"
-            # intentar también la ruta tal cual viene en BASE_FIELDS
-            for try_path in [full_path, f"{beam}{base.get(col_name.replace('_flag',''), path).lstrip('/')}"]:
-                if try_path in hf:
-                    try:
-                        df[col_name] = hf[try_path][mindex:maxdex][mask[mindex:maxdex]]
-                    except Exception:
-                        pass
-                    break
+            if full_path in hf:
+                try:
+                    df[col_name] = hf[full_path][mindex:maxdex][mask[mindex:maxdex]]
+                except Exception:
+                    pass
+
+        # Conservar flags secundarios si existen. No reemplazan el filtro principal.
+        for col_name, rel_path in SECONDARY_QUALITY_FIELDS.get(self.product, {}).items():
+            full_path = f"{beam}{rel_path}"
+            if full_path in hf and col_name not in df.columns:
+                try:
+                    df[col_name] = hf[full_path][mindex:maxdex][mask[mindex:maxdex]]
+                except Exception:
+                    pass
 
         # Variables seleccionadas por el usuario
         for hdf5_path, rh_idx in self.selected_vars:
@@ -309,21 +355,47 @@ class GEDISubsetter:
         initial = len(gdf)
 
         # — Quality flag —
+        # Filtro especifico por producto:
+        # GEDI02_A -> quality_flag, GEDI02_B -> l2b_quality_flag, GEDI04_A -> l4_quality_flag.
         quality_min = f.get('quality', {}).get(self.product, 0)
-        if quality_min > 0 and 'quality_flag' in gdf.columns:
-            gdf = gdf[gdf['quality_flag'].fillna(0) >= quality_min]
+        quality_col = QUALITY_COLUMN_NAMES.get(self.product, 'quality_flag')
+        if quality_min > 0:
+            if quality_col in gdf.columns:
+                before = len(gdf)
+                vals = gdf[quality_col].value_counts(dropna=False).to_dict()
+                gdf = gdf[gdf[quality_col].fillna(0) >= quality_min]
+                print(f"[Subsetter] {self.product}: {quality_col} >= {quality_min} "
+                      f"removed {before - len(gdf)} footprints; values={vals}")
+            else:
+                print(f"[Subsetter] {self.product}: WARNING quality field {quality_col} not found; quality filter skipped")
 
-        # Nota: sensitivity se aplica POST-merge en pipeline.py
-        # como columna quality_passed — no se filtra aquí
+        # Nota: sensitivity se aplica POST-merge en pipeline.py para poder
+        # evaluar columnas de varios productos después del join.
 
         # — Degrade flag —
         if f.get('exclude_degrade', False) and 'degrade_flag' in gdf.columns:
+            before = len(gdf)
+            vals = gdf['degrade_flag'].value_counts(dropna=False).to_dict()
             gdf = gdf[gdf['degrade_flag'].fillna(1) == 0]
+            print(f"[Subsetter] {self.product}: exclude_degrade removed "
+                  f"{before - len(gdf)} footprints; values={vals}")
 
         # — Surface flag —
+        # No se aplica a L4C: wsci_quality_flag ya excluye agua y urbano por diseño,
+        # así que un filtro adicional sobre surface_flag sería redundante y podría
+        # invalidar shots que el equipo de WSCI ya validó como bosque.
         surface_flags = f.get('surface_flags', [])
-        if surface_flags and 'surface_flag' in gdf.columns:
+        if (surface_flags
+                and 'surface_flag' in gdf.columns
+                and self.product != 'GEDI04_C'):
+            before = len(gdf)
+            vals = gdf['surface_flag'].value_counts(dropna=False).to_dict()
             gdf = gdf[gdf['surface_flag'].isin(surface_flags)]
+            print(f"[Subsetter] {self.product}: surface_flag in {surface_flags} "
+                  f"removed {before - len(gdf)} footprints; values={vals}")
+        elif surface_flags and self.product == 'GEDI04_C':
+            print(f"[Subsetter] {self.product}: surface filter skipped "
+                  f"(wsci_quality_flag already excludes water/urban)")
 
         removed = initial - len(gdf)
         if removed > 0:

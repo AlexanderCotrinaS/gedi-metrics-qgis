@@ -35,6 +35,7 @@ L2A_VARS = {
     'chk_l2a_rh70':               ('/rh', 70),
     'chk_l2a_rh75':               ('/rh', 75),
     'chk_l2a_rh80':               ('/rh', 80),
+    'chk_l2a_rh90':               ('/rh', 90),
     'chk_l2a_rh95':               ('/rh', 95),
     'chk_l2a_rh98':               ('/rh', 98),
     'chk_l2a_rh100':              ('/rh', 100),
@@ -74,6 +75,21 @@ L4A_VARS = {
     'chk_l4a_selected_algorithm': ('/selected_algorithm', None),
 }
 
+# L4C — Waveform Structural Complexity Index (WSCI).
+# Set mínimo de variables: la métrica WSCI con sus intervalos de predicción al
+# 95%, las componentes horizontal/vertical, y la flag de calidad estricta del
+# producto. wsci_quality_flag se filtra automáticamente como columna de calidad
+# principal (BASE_FIELDS), pero se mantiene aquí también por si el usuario quiere
+# verla en la tabla aunque el filtro esté en 0.
+L4C_VARS = {
+    'chk_l4c_wsci':               ('/wsci', None),
+    'chk_l4c_wsci_pi_lower':      ('/wsci_pi_lower', None),
+    'chk_l4c_wsci_pi_upper':      ('/wsci_pi_upper', None),
+    'chk_l4c_wsci_xy':            ('/wsci_xy', None),
+    'chk_l4c_wsci_z':             ('/wsci_z', None),
+    'chk_l4c_wsci_quality_flag':  ('/wsci_quality_flag', None),
+}
+
 
 
 # ─────────────────────────────────────────────────────────────
@@ -111,6 +127,8 @@ class PipelineWorker(QtCore.QObject):
         try:
             roi      = self._compute_roi()
             self._prepare_netrc()
+            proxy_desc = self._describe_proxy()
+            self.log.emit(f"[GEDIMetrics] Network  : {proxy_desc}")
             pipeline = self._build_pipeline(roi)
             self.log.emit("[GEDIMetrics] Starting pipeline...")
             pipeline.run_pipeline()
@@ -144,7 +162,7 @@ class PipelineWorker(QtCore.QObject):
             date_end         = self.params["end_date"],
             recurring_months = self.params["recurring_months"],
             roi              = roi,
-            beams            = self.params["beams"],  # None = all beams
+            beams            = self.params["beams"],
             selected_vars    = self.params["selected_vars"],
             filters          = self.params["filters"],
             merge_how        = self.params["merge_how"],
@@ -154,7 +172,24 @@ class PipelineWorker(QtCore.QObject):
             keep_original_file = self.params["keep_original"],
             cancel_event     = self.cancel_event,
             roi_path         = self.params.get("polygon_source") or None,
+            bearer_token     = self.params.get("earthdata_token") or None,
+            proxy_url        = self.params.get("proxy_url") or None,
+            proxy_user       = self.params.get("proxy_user") or None,
+            proxy_pass       = self.params.get("proxy_pass") or None,
+            proxy_auto       = self.params.get("proxy_auto", True),
         )
+
+    def _describe_proxy(self):
+        """Human-readable proxy status for the log."""
+        if self.params.get("proxy_manual") and self.params.get("proxy_url"):
+            return f"manual proxy → {self.params['proxy_url']}"
+        if self.params.get("proxy_auto"):
+            import urllib.request
+            detected = urllib.request.getproxies()
+            if detected:
+                return f"auto proxy → {list(detected.values())[0]}"
+            return "auto-detect (no proxy found — direct connection)"
+        return "direct (no proxy)"
 
     def _prepare_netrc(self):
         user = self.params["earthdata_user"]
@@ -230,11 +265,76 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         from qgis.PyQt.QtCore import QDate
         self.end_date_edit.setDate(QDate.currentDate())
 
+        # Restore saved settings
+        self._load_settings()
+        # Auto-detect network → update status label
+        self._detect_and_update_status()
+
+    def _load_settings(self):
+        from qgis.PyQt.QtCore import QSettings
+        s = QSettings()
+        s.beginGroup("GEDIMetrics")
+        token = s.value("earthdata_token", "")
+        if token:
+            self.earthdata_token_edit.setText(token)
+        user = s.value("earthdata_user", "")
+        if user:
+            self.earthdata_user_edit.setText(user)
+        out_dir = s.value("output_dir", "")
+        if out_dir:
+            self.output_dir_lineedit.setText(out_dir)
+        proxy_url = s.value("proxy_url", "")
+        if proxy_url:
+            self.proxy_url_edit.setText(proxy_url)
+        s.endGroup()
+
+    def _save_settings(self, params):
+        from qgis.PyQt.QtCore import QSettings
+        s = QSettings()
+        s.beginGroup("GEDIMetrics")
+        if params.get("earthdata_token"):
+            s.setValue("earthdata_token", params["earthdata_token"])
+        if params.get("earthdata_user"):
+            s.setValue("earthdata_user", params["earthdata_user"])
+        if params.get("output_dir"):
+            s.setValue("output_dir", params["output_dir"])
+        if params.get("proxy_url"):
+            s.setValue("proxy_url", params["proxy_url"])
+        s.endGroup()
+
+    def _detect_and_update_status(self):
+        """Silent TCP probe — updates lbl_auth_status with one line."""
+        import socket
+        from qgis.PyQt.QtCore import QTimer
+        QTimer.singleShot(300, self._run_probe)
+
+    def _run_probe(self):
+        import socket
+        token = self.earthdata_token_edit.text().strip()
+        if token:
+            self.lbl_auth_status.setText(
+                "✓  Bearer Token detected — ready. "
+                "Token auth works on university networks.")
+            return
+        try:
+            sock = socket.create_connection(
+                ("urs.earthdata.nasa.gov", 443), timeout=6)
+            sock.close()
+            self.lbl_auth_status.setText(
+                "✓  Direct connection — use username and password.")
+        except (socket.timeout, OSError):
+            self.lbl_auth_status.setText(
+                "⚠  University network detected — paste a Bearer Token above. "
+                "Get one free at: urs.earthdata.nasa.gov/user_tokens")
+
     # ── Señales ───────────────────────────────────────────────
     def _connect_signals(self):
         self.run_pipeline.clicked.connect(self.on_run_clicked)
         self.close_button.clicked.connect(self.on_cancel_close)
         self.browse_output_btn.clicked.connect(self.choose_output_dir)
+        # Proxy controls
+        self.chk_proxy_manual.stateChanged.connect(self._on_proxy_manual_toggled)
+        self.btn_test_connection.clicked.connect(self._on_test_connection)
         self.polygon_layer_combo.currentIndexChanged.connect(
             self.on_polygon_layer_changed)
 
@@ -242,6 +342,7 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         self.check_l2a.stateChanged.connect(self._update_product_tabs)
         self.check_l2b.stateChanged.connect(self._update_product_tabs)
         self.check_l4a.stateChanged.connect(self._update_product_tabs)
+        self.check_l4c.stateChanged.connect(self._update_product_tabs)
 
         # Select all / Clear
         self.btn_l2a_all.clicked.connect(lambda: self._set_all_vars('l2a', True))
@@ -250,19 +351,35 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         self.btn_l2b_none.clicked.connect(lambda: self._set_all_vars('l2b', False))
         self.btn_l4a_all.clicked.connect(lambda: self._set_all_vars('l4a', True))
         self.btn_l4a_none.clicked.connect(lambda: self._set_all_vars('l4a', False))
+        self.btn_l4c_all.clicked.connect(lambda: self._set_all_vars('l4c', True))
+        self.btn_l4c_none.clicked.connect(lambda: self._set_all_vars('l4c', False))
 
         # Surface type — All es exclusivo con Land/Water
         self.chk_surf_all.stateChanged.connect(self._on_surface_all_changed)
         self.chk_surf_land.stateChanged.connect(self._on_surface_specific_changed)
         self.chk_surf_water.stateChanged.connect(self._on_surface_specific_changed)
 
+        # Defaults orientados a calidad: quality_flag>=1, exclude degraded
+        # footprints, y restringir a superficie terrestre (Land=1). El usuario
+        # puede relajar estos filtros si necesita máxima cobertura.
+        self.spin_l2a_quality.setValue(1)
+        self.spin_l2b_quality.setValue(1)
+        self.spin_l4a_quality.setValue(1)
+        self.spin_l4c_quality.setValue(1)
+        self.chk_exclude_degrade.setChecked(True)
+        self.chk_surf_all.setChecked(False)
+        self.chk_surf_water.setChecked(False)
+        self.chk_surf_land.setChecked(True)
+
     def _update_product_tabs(self):
         self.tabWidgetVars.setTabEnabled(0, self.check_l2a.isChecked())
         self.tabWidgetVars.setTabEnabled(1, self.check_l2b.isChecked())
         self.tabWidgetVars.setTabEnabled(2, self.check_l4a.isChecked())
+        self.tabWidgetVars.setTabEnabled(3, self.check_l4c.isChecked())
 
     def _set_all_vars(self, product, state):
-        catalog = {'l2a': L2A_VARS, 'l2b': L2B_VARS, 'l4a': L4A_VARS}
+        catalog = {'l2a': L2A_VARS, 'l2b': L2B_VARS,
+                   'l4a': L4A_VARS, 'l4c': L4C_VARS}
         for widget_name in catalog[product]:
             chk = getattr(self, widget_name, None)
             if chk:
@@ -358,17 +475,71 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         self.populate_polygon_layers()
         self.polygon_layer_combo.showPopup()
 
+    # ── Proxy helpers ─────────────────────────────────────────
+    def _on_proxy_manual_toggled(self, state):
+        enabled = state == CHECKED
+        for w in [self.proxy_url_edit, self.proxy_user_edit, self.proxy_pass_edit]:
+            w.setEnabled(enabled)
+        if enabled:
+            self.chk_proxy_auto.setChecked(False)
+
+    def _on_test_connection(self):
+        """Quick TCP probe to urs.earthdata.nasa.gov — runs in the UI thread
+        (it's fast: 8 s max).  Updates the status label with the result."""
+        import socket
+        self.lbl_connection_status.setText("Testing...")
+        QtWidgets.QApplication.processEvents()
+        try:
+            sock = socket.create_connection(("urs.earthdata.nasa.gov", 443), timeout=8)
+            sock.close()
+            self.lbl_connection_status.setText(
+                "✓  Connected — direct access works.")
+        except (socket.timeout, OSError):
+            # Try a basic requests GET through the configured proxy
+            try:
+                import requests
+                proxies = self._collect_proxy_dict()
+                r = requests.get(
+                    "https://urs.earthdata.nasa.gov",
+                    proxies=proxies if proxies else None,
+                    timeout=(8, 10))
+                self.lbl_connection_status.setText(
+                    f"✓  Connected via proxy (HTTP {r.status_code}).")
+            except Exception as exc:
+                self.lbl_connection_status.setText(
+                    f"✗  Failed: {exc}\n"
+                    "  Try enabling Auto-detect or enter proxy manually.")
+
+    def _collect_proxy_dict(self):
+        """Build proxy dict from current GUI state (mirrors downloader logic)."""
+        if self.chk_proxy_manual.isChecked():
+            url  = self.proxy_url_edit.text().strip()
+            user = self.proxy_user_edit.text().strip()
+            pwd  = self.proxy_pass_edit.text()
+            if url:
+                if user and pwd:
+                    from urllib.parse import urlparse
+                    p = urlparse(url)
+                    url = f"{p.scheme}://{user}:{pwd}@{p.netloc}{p.path}"
+                return {"https": url, "http": url}
+        if self.chk_proxy_auto.isChecked():
+            import urllib.request
+            return urllib.request.getproxies()
+        return {}
+
     # ── Recolectar parámetros ─────────────────────────────────
     def collect_parameters(self):
         products = []
         if self.check_l2a.isChecked(): products.append('GEDI02_A')
         if self.check_l2b.isChecked(): products.append('GEDI02_B')
         if self.check_l4a.isChecked(): products.append('GEDI04_A')
+        if self.check_l4c.isChecked(): products.append('GEDI04_C')
 
         selected_vars = {
             'GEDI02_A': self._collect_vars(L2A_VARS),
             'GEDI02_B': self._collect_vars(L2B_VARS),
             'GEDI04_A': self._collect_vars(L4A_VARS),
+            'GEDI04_C': self._collect_vars(L4C_VARS),
         }
 
         surface_flags = []
@@ -381,6 +552,7 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
                 'GEDI02_A': self.spin_l2a_quality.value(),
                 'GEDI02_B': self.spin_l2b_quality.value(),
                 'GEDI04_A': self.spin_l4a_quality.value(),
+                'GEDI04_C': self.spin_l4c_quality.value(),
             },
             'sensitivity': {
                 'value':    self.spin_sensitivity.value(),
@@ -388,6 +560,7 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
                     'GEDI02_A': self.chk_sens_l2a.isChecked(),
                     'GEDI02_B': self.chk_sens_l2b.isChecked(),
                     'GEDI04_A': self.chk_sens_l4a.isChecked(),
+                    'GEDI04_C': self.chk_sens_l4c.isChecked(),
                 }
             },
             'exclude_degrade': self.chk_exclude_degrade.isChecked(),
@@ -424,7 +597,13 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
             "keep_original": self.keep_original_check.isChecked(),
             "earthdata_user": self.earthdata_user_edit.text().strip(),
             "earthdata_pass": self.earthdata_pass_edit.text(),
+            "earthdata_token": self.earthdata_token_edit.text().strip(),
             "keep_login":     self.keep_login_check.isChecked(),
+            "proxy_auto":     self.chk_proxy_auto.isChecked(),
+            "proxy_manual":   self.chk_proxy_manual.isChecked(),
+            "proxy_url":      self.proxy_url_edit.text().strip(),
+            "proxy_user":     self.proxy_user_edit.text().strip(),
+            "proxy_pass":     self.proxy_pass_edit.text(),
         }
 
     def _collect_vars(self, catalog):
@@ -451,6 +630,8 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         return None
 
     def _has_credentials(self, params):
+        if params.get("earthdata_token"):
+            return True
         if params["earthdata_user"] and params["earthdata_pass"]:
             return True
         return any(
@@ -476,8 +657,13 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         self._cancel_event.clear()
         self.close_button.setText("Stop")
 
+        self._save_settings(params)
+
+        auth_mode = "Bearer Token" if params.get("earthdata_token") else "username/password"
         self.log_text_edit.append(
             f"[GEDIMetrics] Products : {', '.join(params['products'])}")
+        self.log_text_edit.append(
+            f"[GEDIMetrics] Auth     : {auth_mode}")
         self.log_text_edit.append(
             f"[GEDIMetrics] Merge    : {params['merge_how']} join")
         self.log_text_edit.append(

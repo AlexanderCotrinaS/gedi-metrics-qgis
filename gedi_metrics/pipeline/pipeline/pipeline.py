@@ -14,14 +14,31 @@ from .subsetter  import GEDISubsetter
 
 
 # Columnas base que NO se duplican en el merge
-# (existen en todos los productos — se toman del primero)
-# quality_flag, degrade_flag, surface_flag y sensitivity
-# se descartan de los productos secundarios para evitar duplicados
+# (existen en todos los productos — se toman del primero).
+# La columna sensitivity NO se descarta: si el usuario la selecciona en L2B/L4A,
+# se conserva con sufijo para que el filtro post-merge pueda evaluarla por producto.
 _BASE_COLS = {
     'shot_number', 'latitude', 'longitude',
     'beam', 'delta_time', 'geometry', 'date',
-    'quality_flag', 'degrade_flag', 'surface_flag', 'sensitivity',
+    'quality_flag', 'degrade_flag', 'surface_flag',
     'rh100',   # rh100 viene de L2A; en L2B se llama igual pero es redundante
+}
+
+# Columnas auxiliares internas que no deben aparecer en los archivos finales.
+# Columnas auxiliares internas que no deben aparecer en los archivos finales.
+# Nota: l2_quality_flag YA NO se descarta. En v1.0.2 se eliminaba porque solo
+# podía aparecer como redundante de L4A; en v1.0.3 es un flag secundario útil
+# para L4C (permite comparar con wsci_quality_flag, que es más estricto).
+_OUTPUT_DROP_COLS = {'quality_passed'}
+
+# Orden preferido para los flags de calidad al final de la tabla de atributos.
+_QUALITY_FLAG_ORDER = {
+    'quality_flag': 0,
+    'l2a_quality_flag': 1,
+    'l2b_quality_flag': 2,
+    'l4_quality_flag': 3,
+    'l2_quality_flag': 4,        # se conserva como flag secundario para L4C
+    'wsci_quality_flag': 5,      # filtro principal de L4C
 }
 
 
@@ -53,6 +70,7 @@ class GEDIPipeline:
         'GEDI02_A': 'GEDI02_A',
         'GEDI02_B': 'GEDI02_B',
         'GEDI04_A': 'GEDI04_A',
+        'GEDI04_C': 'GEDI04_C',
     }
 
     def __init__(self, out_directory, products, version,
@@ -67,7 +85,12 @@ class GEDIPipeline:
                  persist_login=False,
                  keep_original_file=False,
                  cancel_event=None,
-                 roi_path=None):
+                 roi_path=None,
+                 bearer_token=None,
+                 proxy_url=None,
+                 proxy_user=None,
+                 proxy_pass=None,
+                 proxy_auto=True):
 
         self.out_directory      = out_directory
         self.products           = products
@@ -86,6 +109,11 @@ class GEDIPipeline:
         self.keep_original_file = keep_original_file
         self.cancel_event       = cancel_event
         self.roi_path           = roi_path
+        self.bearer_token       = bearer_token
+        self.proxy_url          = proxy_url
+        self.proxy_user         = proxy_user
+        self.proxy_pass         = proxy_pass
+        self.proxy_auto         = proxy_auto
 
         # ROI GeoDataFrame (polígono exacto si existe)
         self.roi_gdf = None
@@ -106,10 +134,25 @@ class GEDIPipeline:
         os.makedirs(out_directory, exist_ok=True)
         self._final_output_path = None
 
+        # Build proxy dict once — shared by Downloader, Finder, and _derive_url
+        from .downloader import _build_proxy_dict
+        self._proxies = _build_proxy_dict(
+            proxy_url=self.proxy_url,
+            proxy_user=self.proxy_user,
+            proxy_pass=self.proxy_pass,
+            auto_detect=self.proxy_auto,
+        )
+
         # Downloader único — la sesión NASA se reutiliza
         self.downloader = GEDIDownloader(
             persist_login=self.persist_login,
-            save_path=self.out_directory)
+            save_path=self.out_directory,
+            bearer_token=self.bearer_token,
+            proxy_url=self.proxy_url,
+            proxy_user=self.proxy_user,
+            proxy_pass=self.proxy_pass,
+            proxy_auto=self.proxy_auto,
+        )
 
     # ── Pipeline principal ────────────────────────────────────
     def run_pipeline(self):
@@ -176,7 +219,7 @@ class GEDIPipeline:
                 print(f"[Pipeline] Empty merge for {stem}")
                 continue
 
-            # Filtro post-merge — añade columna quality_passed
+            # Filtro post-merge de sensitivity. No añade columnas auxiliares.
             merged = self._apply_postmerge_filter(merged)
 
             # Exportar
@@ -206,6 +249,7 @@ class GEDIPipeline:
             date_end         = self.date_end,
             recurring_months = self.recurring_months,
             roi              = self.roi,
+            proxies          = self._proxies,
         )
         granules = finder.find(
             output_filepath=self.out_directory,
@@ -289,9 +333,10 @@ class GEDIPipeline:
                 orbit_num = p[1:]
                 break
 
-        # L4A: nombre de archivo difiere del L2A — buscar en disco o CMR
-        if product == 'GEDI04_A':
-            prefix = 'GEDI04_A'
+        # L4A and L4C: filename differs from L2A — look up on disk or CMR.
+        # Both products live at ORNL DAAC and are matched to L2A by orbit number.
+        if product in ('GEDI04_A', 'GEDI04_C'):
+            prefix = product
             if orbit_num:
                 existing = [
                     f for f in os.listdir(self.out_directory)
@@ -334,21 +379,36 @@ class GEDIPipeline:
     def _derive_url(self, filename, product):
         """
         Construye la URL de descarga para un producto usando la API CMR de NASA.
-        Para L4A busca por orbit number ya que el nombre de archivo difiere de L2A/L2B.
+        - L2A/L2B: nombre de archivo idéntico salvo el shortname → búsqueda directa
+          por producer_granule_id.
+        - L4A y L4C: nombre de archivo difiere del L2A → búsqueda por orbit number
+          + bbox + temporal en ORNL_CLOUD. L4C usa short_name (más estable que el
+          concept_id para productos cuya revisión cambia con frecuencia).
         """
         import requests as req
 
-        concept_ids = {
+        # Selector CMR por producto. concept_id para todos los productos.
+        # L4C tiene fallback runtime en caso de que ORNL re-ingeste.
+        product_selectors = {
             'GEDI02_A.002': 'C2142771958-LPCLOUD',
             'GEDI02_B.002': 'C2142776747-LPCLOUD',
             'GEDI04_A.002': 'C2237824918-ORNL_CLOUD',
+            'GEDI04_C.002': 'C3049900163-ORNL_CLOUD',
         }
         key = f"{product}.{self.version}"
-        if key not in concept_ids:
+
+        if key in product_selectors:
+            cmr_selector = f"concept_id={product_selectors[key]}"
+        elif product == 'GEDI04_C':
+            from .finder import _resolve_l4c_concept_id
+            l4c_cid = _resolve_l4c_concept_id(proxies=self._proxies)
+            if not l4c_cid:
+                print(f"[Pipeline] Could not resolve L4C concept_id")
+                return None
+            cmr_selector = f"concept_id={l4c_cid}"
+        else:
             print(f"[Pipeline] Unknown product key: {key}")
             return None
-
-        concept_id = concept_ids[key]
 
         # Extraer orbit number del nombre de archivo (ej: O02577)
         # El nombre tiene formato: GEDI02_A_YYYYDDDHHMMSS_OXXXXX_...
@@ -359,17 +419,18 @@ class GEDIPipeline:
                 orbit_num = p[1:]   # ej: '02577'
                 break
 
-        # Para L2B: el nombre es casi idéntico al L2A — buscar directo
-        if product != 'GEDI04_A':
+        # ── Productos LP DAAC (L2A, L2B) ──
+        # El nombre es casi idéntico al L2A — buscar directo por producer_granule_id
+        if product not in ('GEDI04_A', 'GEDI04_C'):
             granule_id = filename.replace('.h5', '')
             cmr_url = (
                 f"https://cmr.earthdata.nasa.gov/search/granules.json"
-                f"?concept_id={concept_id}"
+                f"?{cmr_selector}"
                 f"&producer_granule_id={granule_id}"
                 f"&page_size=1"
             )
             try:
-                resp = req.get(cmr_url, timeout=30)
+                resp = req.get(cmr_url, proxies=self._proxies or None, timeout=(10, 30))
                 entries = resp.json().get('feed', {}).get('entry', [])
                 if entries:
                     for link in entries[0].get('links', []):
@@ -382,20 +443,30 @@ class GEDIPipeline:
             print(f"[Pipeline] Could not find URL for {product} / {filename}")
             return None
 
-        # Para L4A: el nombre difiere — buscar por orbit number y bbox
-        # GEDI04_A usa ORNL y tiene naming diferente al L2A
+        # ── Productos ORNL DAAC (L4A, L4C) ──
+        # El nombre difiere del L2A — buscar por orbit number, bbox y fecha.
+        # L4A tiene 1 granule por órbita. L4C usa sub-orbits: un orbit L2A puede
+        # corresponder a múltiples sub-granules L4C, así que aceptamos cualquiera
+        # que cubra nuestro bbox.
         if orbit_num is None:
             print(f"[Pipeline] Could not extract orbit from {filename}")
             return None
 
         print(f"[Pipeline] Searching {product} granule for orbit O{orbit_num}...")
 
-        def _get_ornl_url(entries_list, orbit):
-            """Extrae URL HTTP directa de ORNL de una lista de entries CMR."""
+        def _get_ornl_url(entries_list, orbit, strict_orbit=True):
+            """Extrae URL HTTP directa de ORNL de una lista de entries CMR.
+
+            Args:
+                strict_orbit: si True, exige que O{orbit} aparezca en el título
+                              del granule (para L4A). Si False, acepta cualquier
+                              entry con link .h5 (para L4C sub-orbits, donde CMR
+                              ya filtró por orbit_number en el request).
+            """
             for entry in entries_list:
                 title = (entry.get('producer_granule_id', '')
                          or entry.get('title', ''))
-                if f"O{orbit}" not in title:
+                if strict_orbit and f"O{orbit}" not in title:
                     continue
                 # Preferir link HTTP directo de ORNL (no s3, no opendap)
                 for link in entry.get('links', []):
@@ -407,27 +478,34 @@ class GEDIPipeline:
                         return href
             return None
 
+        # L4C sub-orbits: no exigir que el título tenga O{orbit}
+        # porque el orbit_number en el request CMR ya lo garantiza
+        strict_orbit = (product != 'GEDI04_C')
+
         try:
-            # Búsqueda 1: por bbox
+            # Búsqueda 1: por bbox + orbit_number (parámetro CMR nativo)
+            # orbit_number funciona tanto para L4A (1 granule/orbit) como
+            # para L4C (n sub-granules/orbit) — CMR filtra por nosotros.
             [ul_lat, ul_lon, lr_lat, lr_lon] = self.roi
             bbox = f"{ul_lon},{lr_lat},{lr_lon},{ul_lat}"
             r1 = req.get(
                 f"https://cmr.earthdata.nasa.gov/search/granules.json"
-                f"?concept_id={concept_id}&bounding_box={bbox}&page_size=10",
-                timeout=30)
+                f"?{cmr_selector}&bounding_box={bbox}"
+                f"&orbit_number={orbit_num}&page_size=50",
+                proxies=self._proxies or None, timeout=(10, 30))
             entries = r1.json().get('feed', {}).get('entry', [])
-            url = _get_ornl_url(entries, orbit_num)
+            print(f"[Pipeline] CMR search 1 ({product}): "
+                  f"{len(entries)} entries for orbit {orbit_num} + bbox")
+            url = _get_ornl_url(entries, orbit_num, strict_orbit)
             if url:
                 print(f"[Pipeline] Found URL for {product}: {url}")
                 return url
 
-            # Búsqueda 2: por fecha derivada del nombre del granule
+            # Búsqueda 2: por fecha derivada + bbox + orbit_number
             # El basename contiene YYYYDDD (día juliano) — convertir a fecha ISO
             date_str = None
             try:
-                # Extraer YYYYDDD del basename: GEDI02_A_YYYYDDDHHMMSS_...
                 parts_fn = filename.replace('.h5','').split('_')
-                # El campo de fecha es el 3er elemento: ej 2019147190447
                 datetime_field = parts_fn[2] if len(parts_fn) > 2 else ''
                 if len(datetime_field) >= 7:
                     import datetime
@@ -444,24 +522,49 @@ class GEDIPipeline:
             if date_str:
                 r2 = req.get(
                     f"https://cmr.earthdata.nasa.gov/search/granules.json"
-                    f"?concept_id={concept_id}"
+                    f"?{cmr_selector}"
                     f"&temporal={date_str}"
                     f"&bounding_box={bbox}"
-                    f"&page_size=10",
-                    timeout=30)
+                    f"&orbit_number={orbit_num}"
+                    f"&page_size=50",
+                    proxies=self._proxies or None, timeout=(10, 30))
                 entries2 = r2.json().get('feed', {}).get('entry', [])
-            url2 = _get_ornl_url(entries2, orbit_num)
+                print(f"[Pipeline] CMR search 2 ({product}): "
+                      f"{len(entries2)} entries for orbit {orbit_num} + bbox + temporal")
+            url2 = _get_ornl_url(entries2, orbit_num, strict_orbit)
             if url2:
                 print(f"[Pipeline] Found URL for {product}: {url2}")
                 return url2
 
-            # Búsqueda 3: fallback — cualquier .h5 en entries que tenga orbit
-            for e_list in [entries, entries2]:
+            # Búsqueda 3: sin orbit_number — solo temporal + bbox, buscar
+            # entre todos los resultados el que contenga O{orbit}. Cubre el
+            # caso donde CMR no soporta orbit_number para este collection.
+            entries3 = []
+            if date_str:
+                r3 = req.get(
+                    f"https://cmr.earthdata.nasa.gov/search/granules.json"
+                    f"?{cmr_selector}"
+                    f"&temporal={date_str}"
+                    f"&bounding_box={bbox}"
+                    f"&page_size=200",
+                    proxies=self._proxies or None, timeout=(10, 45))
+                entries3 = r3.json().get('feed', {}).get('entry', [])
+                print(f"[Pipeline] CMR search 3 ({product}): "
+                      f"{len(entries3)} entries for temporal + bbox (no orbit filter)")
+            # Try strict orbit match first, then relaxed
+            url3 = _get_ornl_url(entries3, orbit_num, strict_orbit=True)
+            if url3:
+                print(f"[Pipeline] Found URL for {product}: {url3}")
+                return url3
+            # Relaxed: accept any entry with .h5 link
+            url3r = _get_ornl_url(entries3, orbit_num, strict_orbit=False)
+            if url3r:
+                print(f"[Pipeline] Found URL for {product} (relaxed): {url3r}")
+                return url3r
+
+            # Búsqueda 4: last-ditch fallback from all earlier results
+            for e_list in [entries, entries2, entries3]:
                 for entry in e_list:
-                    title = (entry.get('producer_granule_id', '')
-                             or entry.get('title', ''))
-                    if f"O{orbit_num}" not in title:
-                        continue
                     for link in entry.get('links', []):
                         href = link.get('href', '')
                         if href.endswith('.h5') and href.startswith('https://'):
@@ -490,7 +593,16 @@ class GEDIPipeline:
         print(f"[Pipeline] Merging {', '.join(products)} "
               f"({self.merge_how} join) by shot_number ...")
 
-        # Sufijos para columnas duplicadas (ej. sensitivity_L2A, sensitivity_L2B)
+        # Sufijos por producto. Se usa una tabla explícita para evitar errores
+        # con los productos cuya conversión por replace() encadenado da un
+        # resultado incorrecto (ej. GEDI04_C). Sufijos como _L2A o _L4C son
+        # los que verá el usuario en columnas duplicadas (sensitivity_L2A, etc.).
+        PRODUCT_SUFFIXES = {
+            'GEDI02_A': '_L2A',
+            'GEDI02_B': '_L2B',
+            'GEDI04_A': '_L4A',
+            'GEDI04_C': '_L4C',
+        }
         merged = gdfs[products[0]].copy()
 
         for product in products[1:]:
@@ -503,7 +615,7 @@ class GEDIPipeline:
             right = right.drop(columns=drop_cols, errors='ignore')
 
             # Añadir sufijo al producto para columnas que se repiten
-            suffix = f"_{product.replace('GEDI0', 'L').replace('_A','A').replace('_B','B')}"
+            suffix = PRODUCT_SUFFIXES.get(product, f"_{product}")
 
             merged = merged.merge(
                 right,
@@ -523,60 +635,105 @@ class GEDIPipeline:
     # ── Filtro post-merge ─────────────────────────────────────
     def _apply_postmerge_filter(self, gdf: gp.GeoDataFrame) -> gp.GeoDataFrame:
         """
-        Aplica sensitivity como flag después del merge.
-        En lugar de eliminar shots, añade columna 'quality_passed' (bool).
-        Un shot pasa si TODOS los productos que tiene datos superan el umbral.
+        Aplica el filtro de sensitivity después del merge.
+
+        No crea la columna auxiliar quality_passed. Si el usuario marcó
+        sensitivity para un producto y existe su columna, el shot se elimina
+        solo cuando ese producto tiene dato y su sensitivity está bajo el umbral.
+        En outer join, los NaN de productos ausentes no penalizan el shot.
         """
         f = self.filters
         sens_cfg  = f.get('sensitivity', {})
         min_sens  = sens_cfg.get('value', 0.90)
         apply_to  = sens_cfg.get('apply_to', {})
 
-        # Columnas de sensitivity presentes en el GeoDataFrame
-        # Pueden ser 'sensitivity' (L2A), 'sensitivity_L2B', 'sensitivity_L4A'
         sens_cols = [c for c in gdf.columns if 'sensitivity' in c.lower()]
-
         if not sens_cols:
-            gdf['quality_passed'] = True
             return gdf
 
-        # Para cada producto activo que tenga sensitivity, verificar el umbral
-        # Solo se evalúan columnas de productos que el usuario marcó para filtrar
         conditions = []
         for col in sens_cols:
-            # Determinar a qué producto corresponde esta columna
-            product = None
-            if col == 'sensitivity':
-                product = self.products[0] if self.products else None
-            elif '_L2B' in col:
-                product = 'GEDI02_B'
-            elif '_L4A' in col:
-                product = 'GEDI04_A'
-
-            # Solo filtrar si el usuario lo indicó para este producto
+            product = self._product_from_sensitivity_column(col)
             if product and apply_to.get(product, False):
-                # NaN = el shot no tiene dato de ese producto (outer join)
-                # → no penalizar, solo evaluar donde hay dato
                 has_data = gdf[col].notna()
                 passes   = gdf[col].fillna(min_sens + 1) >= min_sens
-                # El shot falla solo si TIENE dato Y ese dato está bajo el umbral
                 conditions.append(~has_data | passes)
 
-        if conditions:
-            import functools
-            quality_mask = functools.reduce(lambda a, b: a & b, conditions)
-            gdf['quality_passed'] = quality_mask
-        else:
-            gdf['quality_passed'] = True
+        if not conditions:
+            return gdf
 
-        passed = gdf['quality_passed'].sum()
-        total  = len(gdf)
-        print(f"[Pipeline] quality_passed: {passed}/{total} shots "
-              f"({passed/total*100:.1f}%) — sensitivity >= {min_sens}")
+        import functools
+        keep_mask = functools.reduce(lambda a, b: a & b, conditions)
+        before = len(gdf)
+        gdf = gdf[keep_mask].copy()
+        removed = before - len(gdf)
+        pct = 0 if before == 0 else len(gdf) / before * 100
+        print(f"[Pipeline] sensitivity >= {min_sens}: retained "
+              f"{len(gdf)}/{before} shots ({pct:.1f}%), removed {removed}")
+        return gdf
+
+    def _product_from_sensitivity_column(self, col: str):
+        """Mapea columnas sensitivity/sensitivity_L2B/sensitivity_L4A/sensitivity_L4C a producto."""
+        if col == 'sensitivity':
+            # La columna sin sufijo pertenece al primer producto del merge.
+            return self.products[0] if self.products else None
+        if '_L2A' in col:
+            return 'GEDI02_A'
+        if '_L2B' in col:
+            return 'GEDI02_B'
+        if '_L4A' in col:
+            return 'GEDI04_A'
+        if '_L4C' in col:
+            return 'GEDI04_C'
+        return None
+
+    # ── Limpieza y orden de columnas ──────────────────────────
+    def _finalize_output_columns(self, gdf: gp.GeoDataFrame) -> gp.GeoDataFrame:
+        """
+        Prepara la tabla de salida:
+          - elimina columnas auxiliares internas (quality_passed);
+          - mueve todos los *_quality_flag al final de la tabla de atributos.
+        l2_quality_flag se conserva si aparece (caso L4C) como flag secundario.
+        """
+        if gdf is None or len(gdf.columns) == 0:
+            return gdf
+
+        crs = getattr(gdf, 'crs', None)
+        geom_col = None
+        try:
+            geom_col = gdf.geometry.name
+        except Exception:
+            if 'geometry' in gdf.columns:
+                geom_col = 'geometry'
+
+        drop_cols = [c for c in _OUTPUT_DROP_COLS if c in gdf.columns]
+        if drop_cols:
+            gdf = gdf.drop(columns=drop_cols, errors='ignore')
+
+        non_geom_cols = [c for c in gdf.columns if c != geom_col]
+        quality_cols = [
+            c for c in non_geom_cols
+            if c.lower() == 'quality_flag' or c.lower().endswith('_quality_flag')
+        ]
+        quality_cols = sorted(
+            quality_cols,
+            key=lambda c: (_QUALITY_FLAG_ORDER.get(c.lower(), 99), c.lower())
+        )
+        regular_cols = [c for c in non_geom_cols if c not in quality_cols]
+
+        ordered_cols = regular_cols + quality_cols
+        if geom_col and geom_col in gdf.columns:
+            ordered_cols.append(geom_col)
+
+        gdf = gdf.loc[:, ordered_cols].copy()
+        if geom_col and geom_col in gdf.columns:
+            gdf = gp.GeoDataFrame(gdf, geometry=geom_col, crs=crs)
         return gdf
 
     # ── Export ────────────────────────────────────────────────
     def _export(self, gdf: gp.GeoDataFrame, stem: str):
+        gdf = self._finalize_output_columns(gdf)
+
         if self.out_gpkg:
             out_path = os.path.join(self.out_directory, f"{stem}_merged.gpkg")
             try:
@@ -650,6 +807,8 @@ class GEDIPipeline:
         merged = gp.pd.concat(frames, ignore_index=True)
         if hasattr(merged, 'set_geometry') and 'geometry' in merged.columns:
             merged = gp.GeoDataFrame(merged, geometry='geometry', crs='EPSG:4326')
+
+        merged = self._finalize_output_columns(merged)
 
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         print(f"[Pipeline] Final merge: {len(merged)} total footprints, "

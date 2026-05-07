@@ -1,166 +1,339 @@
+"""
+GEDIMetrics v1.0.3 — downloader.py
+
+Authentication strategy (in priority order):
+  1. Bearer Token  — user pastes a NASA EarthData token in the GUI.
+                     Uses ONLY data.lpdaac.earthdatacloud.nasa.gov (CloudFront).
+                     NO connection to urs.earthdata.nasa.gov needed.
+                     ✓ Works on university / corporate firewalls.
+
+  2. netrc / Basic — legacy fallback: username + password via OAuth redirect.
+                     Requires direct access to urs.earthdata.nasa.gov:443.
+                     Only used when no token is provided.
+
+Other fixes carried from v1.0.2:
+  - Explicit (connect, read) timeouts on all requests
+  - HTTPAdapter with exponential-backoff Retry
+  - Pre-flight TCP check with actionable error messages
+  - Proxy support (auto-detect OS proxy or manual URL)
+"""
+
 import os
+import socket
 import requests
 import getpass
 import netrc
+from urllib.parse import urlparse
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
+# ── Timeout constants ──────────────────────────────────────────────────────────
+CONNECT_TIMEOUT   = 20
+READ_TIMEOUT      = 360
+PREFLIGHT_TIMEOUT = 8
+
+# ── Retry constants ────────────────────────────────────────────────────────────
+RETRY_TOTAL       = 5
+RETRY_BACKOFF     = 1.5
+RETRY_STATUS_LIST = [429, 500, 502, 503, 504]
+
+
+# ── Connectivity probe ─────────────────────────────────────────────────────────
+def _check_host_reachable(host: str, port: int = 443,
+                          timeout: int = PREFLIGHT_TIMEOUT) -> bool:
+    try:
+        sock = socket.create_connection((host, port), timeout=timeout)
+        sock.close()
+        return True
+    except (socket.timeout, OSError):
+        return False
+
+
+# ── Proxy builder ──────────────────────────────────────────────────────────────
+def _build_proxy_dict(proxy_url=None, proxy_user=None,
+                      proxy_pass=None, auto_detect=True) -> dict:
+    if proxy_url and proxy_url.strip():
+        url = proxy_url.strip()
+        if proxy_user and proxy_pass:
+            p = urlparse(url)
+            url = f"{p.scheme}://{proxy_user}:{proxy_pass}@{p.netloc}{p.path}"
+        return {"https": url, "http": url}
+    if auto_detect:
+        import urllib.request
+        detected = urllib.request.getproxies()
+        if detected:
+            print(f"[Proxy] System proxy detected: {detected}")
+            return detected
+    return {}
+
+
+# ── Token-based session (no URS contact needed) ────────────────────────────────
+class SessionToken(requests.Session):
+    """
+    Authenticates every request with:
+        Authorization: Bearer <token>
+
+    The token is obtained once from urs.earthdata.nasa.gov/user_tokens
+    by the USER in their browser — the plugin never contacts URS at runtime.
+    All actual data downloads go to *.earthdatacloud.nasa.gov (CloudFront/AWS),
+    which is reachable from university networks.
+    """
+
+    def __init__(self, token: str, proxy_url=None, proxy_user=None,
+                 proxy_pass=None, proxy_auto=True):
+        super().__init__()
+        self.headers.update({"Authorization": f"Bearer {token}"})
+        self._configure(proxy_url, proxy_user, proxy_pass, proxy_auto)
+
+    def _configure(self, proxy_url, proxy_user, proxy_pass, proxy_auto):
+        proxy_dict = _build_proxy_dict(proxy_url, proxy_user, proxy_pass, proxy_auto)
+        if proxy_dict:
+            self.proxies.update(proxy_dict)
+            print(f"[Downloader] Proxy: {list(proxy_dict.values())[0]}")
+
+        retry = Retry(
+            total=RETRY_TOTAL, backoff_factor=RETRY_BACKOFF,
+            status_forcelist=RETRY_STATUS_LIST,
+            allowed_methods=["GET", "HEAD"], raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self.mount("https://", adapter)
+        self.mount("http://",  adapter)
+
+    def get(self, url, **kwargs):
+        kwargs.setdefault("timeout", (CONNECT_TIMEOUT, READ_TIMEOUT))
+        return super().get(url, **kwargs)
+
+    def rebuild_auth(self, prepared_request, response):
+        """Keep Bearer token on redirects within *.nasa.gov; strip elsewhere."""
+        url = prepared_request.url
+        if url and "nasa.gov" not in url:
+            prepared_request.headers.pop("Authorization", None)
+
+
+# ── netrc / Basic session (legacy, requires URS access) ───────────────────────
 class SessionNASA(requests.Session):
     """
-    Simple EarthData session using requests + .netrc/_netrc credentials.
+    Legacy Basic-auth session via .netrc.
+    Requires direct TCP access to urs.earthdata.nasa.gov:443.
+    Used only when no Bearer token is provided.
     """
 
     AUTH_HOST = "urs.earthdata.nasa.gov"
 
-    def __init__(self, username=None, password=None):
+    def __init__(self, username=None, password=None,
+                 proxy_url=None, proxy_user=None,
+                 proxy_pass=None, proxy_auto=True):
         super().__init__()
         self.username, self.password = self._load_credentials(username, password)
         self.auth = (self.username, self.password)
 
+        proxy_dict = _build_proxy_dict(proxy_url, proxy_user, proxy_pass, proxy_auto)
+        if proxy_dict:
+            self.proxies.update(proxy_dict)
+
+        retry = Retry(
+            total=RETRY_TOTAL, backoff_factor=RETRY_BACKOFF,
+            status_forcelist=RETRY_STATUS_LIST,
+            allowed_methods=["GET", "HEAD"], raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self.mount("https://", adapter)
+        self.mount("http://",  adapter)
+
     def _load_credentials(self, username, password):
         if username and password:
             return username, password
-
-        # Try .netrc / _netrc
-        netrc_paths = [os.path.expanduser("~/.netrc"), os.path.expanduser("~/_netrc")]
-        for path in netrc_paths:
+        for path in [os.path.expanduser("~/.netrc"),
+                     os.path.expanduser("~/_netrc")]:
             if os.path.exists(path):
                 try:
                     creds = netrc.netrc(path).authenticators(self.AUTH_HOST)
                     if creds:
+                        print(f"[Auth] Credentials from {path}")
                         return creds[0], creds[2]
-                except Exception:
-                    continue
-
-        # Fallback to prompt (CLI use; in GUI we expect netrc to exist)
-        print("[Downloader] Introduce your credentials to access the Data Repository")
-        user = input("Username : ")
-        pwd = getpass.getpass()
+                except Exception as exc:
+                    print(f"[Auth] Could not parse {path}: {exc}")
+        print("[Downloader] No .netrc credentials — prompting.")
+        user = input("EarthData username : ")
+        pwd  = getpass.getpass("EarthData password : ")
         return user, pwd
 
+    def get(self, url, **kwargs):
+        kwargs.setdefault("timeout", (CONNECT_TIMEOUT, READ_TIMEOUT))
+        return super().get(url, **kwargs)
+
     def rebuild_auth(self, prepared_request, response):
-        """
-        Strip auth on redirects to non-URS hosts to avoid leaking credentials.
-        """
-        headers = prepared_request.headers
-        url = prepared_request.url
+        headers    = prepared_request.headers
+        url        = prepared_request.url
         if "Authorization" in headers:
-            original_parsed = requests.utils.urlparse(response.request.url)
-            redirect_parsed = requests.utils.urlparse(url)
-            if (
-                original_parsed.hostname != redirect_parsed.hostname
-                and redirect_parsed.hostname != self.AUTH_HOST
-                and original_parsed.hostname != self.AUTH_HOST
-            ):
+            orig  = requests.utils.urlparse(response.request.url).hostname
+            redir = requests.utils.urlparse(url).hostname
+            if orig != redir and redir != self.AUTH_HOST and orig != self.AUTH_HOST:
                 del headers["Authorization"]
-        return
 
+
+# ── GEDIDownloader ─────────────────────────────────────────────────────────────
 class GEDIDownloader:
-	"""
-	The GEDIDownloader :class: implements a downloading mechanism for a given NASA Repository link, while keeping
-	an authorization session alive.
+    """
+    Downloads GEDI HDF5 granules from NASA EarthData.
 
-	It implements a file chunk downloading mechanism and a file checking step to skip a download or not.
+    v1.0.3 — Bearer Token authentication
+    ──────────────────────────────────────
+    University / corporate firewalls block urs.earthdata.nasa.gov (IP
+    198.118.243.33, not on CloudFront). Bearer Token authentication avoids
+    that host entirely: the user generates a token once in their browser
+    and pastes it into the plugin. All downloads then use only
+    *.earthdatacloud.nasa.gov (CloudFront IPs), which universities allow.
 
-	Args:
-		persist_login: Choice to persist login and save to a .netrc file. See Earthdata Access API for more info:
-					   https://earthaccess.readthedocs.io/en/latest/howto/authenticate/
-		save_path: Absolute path to save the downloaded files. If None, saves to current working directory (script).
-	"""
+    Auth priority:
+        1. bearer_token  → SessionToken  (no URS contact, firewall-safe)
+        2. username/pwd  → SessionNASA   (legacy, needs URS access)
 
-	def __init__(self, persist_login=False, save_path=None):
-		self.save_path = save_path if save_path is not None else ""
-		print("Logging in EarthData...")
-		# earthaccess is unavailable for QGIS; rely on requests + netrc.
-		self.session = SessionNASA()
-	
-	def __download(self, content, save_path):
-		"""Download"""
-		written = 0
-		with open(save_path, "wb") as file:
-			for chunk in content:
-				# Filter out keep alive chunks
-				if not chunk:
-					continue
-				file.write(chunk)
-				written += len(chunk)
+    Args:
+        save_path     : directory for downloaded .h5 files
+        bearer_token  : NASA EarthData Bearer token (recommended)
+        username      : EarthData username (fallback if no token)
+        password      : EarthData password (fallback if no token)
+        proxy_url     : manual proxy URL
+        proxy_user    : proxy username
+        proxy_pass    : proxy password
+        proxy_auto    : auto-detect OS proxy settings
+    """
 
-	def __precheck_file(self, file_path, size):
-		"""
-		Prechecking file mechanism function - if not exists or is corrupted (not equal to the download size), it downloads the file.
-		"""
-		# File does not exist in save_path
-		if not os.path.exists(file_path):
-			print(f"[Downloader] Downloading granule and saving \"{file_path}\"...")
-			return False
+    def __init__(self, persist_login=False, save_path=None,
+                 bearer_token=None,
+                 username=None, password=None,
+                 proxy_url=None, proxy_user=None, proxy_pass=None,
+                 proxy_auto=True):
 
-		# File exists but not complete, restart download
-		if os.path.getsize(file_path) != size:
-			print(f"[Downloader] File at \"{file_path}\" exists but corrupted. Downloading again...")
-			# Delete file and restart download
-			os.remove(file_path)
-			return False
+        self.save_path = save_path or ""
 
-		# File exists and complete, skip download
-		print(f"[Downloader] File at \"{file_path}\" exists. Skipping download...")
-		return True
+        if bearer_token and bearer_token.strip():
+            # ── Token auth path ────────────────────────────────────────────────
+            print("[Downloader] Auth mode: Bearer Token (firewall-safe).")
+            print("[Downloader] Skipping URS check — token auth does not need it.")
+            self.session = SessionToken(
+                token      = bearer_token.strip(),
+                proxy_url  = proxy_url,
+                proxy_user = proxy_user,
+                proxy_pass = proxy_pass,
+                proxy_auto = proxy_auto,
+            )
+        else:
+            # ── Legacy netrc/Basic auth path ───────────────────────────────────
+            print("[Downloader] Auth mode: username/password (legacy).")
+            print("[Downloader] Checking connectivity to urs.earthdata.nasa.gov ...")
+            if not _check_host_reachable("urs.earthdata.nasa.gov"):
+                print(
+                    "\n[Downloader] ⚠  Cannot reach urs.earthdata.nasa.gov:443\n"
+                    "\n"
+                    "  Your network (university / corporate firewall) blocks this host.\n"
+                    "  USERNAME + PASSWORD WILL NOT WORK.\n"
+                    "\n"
+                    "  ✓  SOLUTION — use a Bearer Token instead:\n"
+                    "    1. Open in your browser (it works even if curl cannot):\n"
+                    "       https://urs.earthdata.nasa.gov/user_tokens\n"
+                    "    2. Click 'Generate Token'\n"
+                    "    3. Copy the token\n"
+                    "    4. Paste it in GEDIMetrics → EarthData tab → 'Bearer Token'\n"
+                    "\n"
+                    "  The plugin will still try, but downloads will likely fail.\n"
+                )
+            else:
+                print("[Downloader] ✓  URS reachable — using username/password.")
 
+            self.session = SessionNASA(
+                username   = username,
+                password   = password,
+                proxy_url  = proxy_url,
+                proxy_user = proxy_user,
+                proxy_pass = proxy_pass,
+                proxy_auto = proxy_auto,
+            )
 
-	def download_granule(self, url, chunk_size=128):
-		"""
-		This function downloads the file from a given URL. Must keep a Login Session alive.
-		Args:
-			url: NASA Repo URL to download the file.
-			chunk_size: Specify chunk size for download in kilobytes. Defaults to 128 KB.
-		"""
-		filename = url.split("/")[-1]
+    # ── private ───────────────────────────────────────────────────────────────
+    def __write_chunks(self, content_iter, save_path):
+        with open(save_path, "wb") as fh:
+            for chunk in content_iter:
+                if chunk:
+                    fh.write(chunk)
 
-		# If even the filename does not have "GEDI" in it, do not download
-		if not "GEDI" in filename:
-			print(f"[Downloader] Invalid URL {url}. Please check URL and download again.")
-			return False
+    def __precheck_file(self, file_path, expected_size):
+        name = os.path.basename(file_path)
+        if not os.path.exists(file_path):
+            print(f"[Downloader] → {name}")
+            return False
+        actual = os.path.getsize(file_path)
+        if actual != expected_size:
+            print(f"[Downloader] Incomplete ({actual}/{expected_size} B), retrying: {name}")
+            os.remove(file_path)
+            return False
+        print(f"[Downloader] Already complete, skipping: {name}")
+        return True
 
-		file_path = os.path.join(self.save_path, filename)
-		chunk_size = chunk_size * 1024 # KB chunk
+    # ── public ────────────────────────────────────────────────────────────────
+    def download_granule(self, url: str, chunk_size_kb: int = 256) -> bool:
+        filename  = url.split("/")[-1]
+        file_path = os.path.join(self.save_path, filename)
 
-		http_response = self.session.get(url, stream=True)
+        if "GEDI" not in filename:
+            print(f"[Downloader] Invalid URL: {url}")
+            return False
 
-		# If http response other than OK 200, user needs to check credentials
-		if not http_response.ok:
-			print(f"[Downloader] Invalid credentials for Login session. You may want to delete the credentials on the '.netrc' file and start over.")
-			return False
+        try:
+            resp = self.session.get(url, stream=True)
+        except requests.exceptions.ConnectTimeout:
+            print(f"[Downloader] Connect timeout: {filename}")
+            return False
+        except requests.exceptions.ProxyError as exc:
+            print(f"[Downloader] Proxy error: {exc}")
+            return False
+        except requests.exceptions.ReadTimeout:
+            print(f"[Downloader] Read timeout: {filename}")
+            return False
+        except requests.exceptions.ConnectionError as exc:
+            print(f"[Downloader] Connection error: {exc}")
+            return False
 
-		response_length = http_response.headers.get('content-length')
-		if response_length is None:
-			print("[Downloader] Missing content-length header; skipping download.")
-			return False
+        if resp.status_code == 401:
+            print(
+                f"[Downloader] HTTP 401 Unauthorized: {filename}\n"
+                "  → Token may be expired. Generate a new one at:\n"
+                "    https://urs.earthdata.nasa.gov/user_tokens"
+            )
+            return False
 
-		# If file not exists, download
-		if not self.__precheck_file(file_path, int(response_length)):
-			self.__download(http_response.iter_content(chunk_size=chunk_size), file_path)
+        if not resp.ok:
+            print(f"[Downloader] HTTP {resp.status_code}: {filename}")
+            return False
 
-		# Check file integrity / if it downloaded correctly
-		if not os.path.getsize(file_path) == int(response_length):
-			# If not downloaded correctly, send message for download retry
-			return False
+        content_length = resp.headers.get("content-length")
+        if not content_length:
+            print(f"[Downloader] No content-length, skipping: {filename}")
+            return False
 
-		return True
+        expected = int(content_length)
+        if self.__precheck_file(file_path, expected):
+            return True
 
-	def download_files(self, files_url):
-		"""
-		This function downloads a list of files with given URLs. Must keep a Login Session alive.
-		Args:
-			files_url: A list containing GEDI files URLs from EarthData Repository
-		"""
+        self.__write_chunks(resp.iter_content(chunk_size=chunk_size_kb * 1024), file_path)
 
-		# Start download for every granule
-		for g in files_url:
-			if not self.download_granule(g[0]):
-				retries = 3
-				print(f"[Downloader] Fail download for link {g}. Retrying...")
-				while retries > 0:
-					print(f"Retry {retries}")
-					if self.download_granule(g[0]):
-						break
-					retries -= 1
-				if retries == 0:
-					print(f"[Downloader] Fail download for link {g}. Skipping...")
-		return files_url
+        actual = os.path.getsize(file_path)
+        if actual != expected:
+            print(f"[Downloader] Size mismatch ({actual}/{expected}): {filename}")
+            return False
+        return True
+
+    def download_files(self, files_url: list, max_retries: int = 3) -> list:
+        for url, _ in files_url:
+            if self.download_granule(url):
+                continue
+            print(f"[Downloader] Retrying: {url.split('/')[-1]}")
+            for attempt in range(1, max_retries + 1):
+                print(f"[Downloader]   attempt {attempt}/{max_retries}")
+                if self.download_granule(url):
+                    break
+            else:
+                print(f"[Downloader] Giving up after {max_retries} retries.")
+        return files_url

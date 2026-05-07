@@ -47,6 +47,7 @@
             <item><widget class="QCheckBox" name="check_l2a"><property name="text"><string>L2A - Canopy Height</string></property><property name="checked"><bool>true</bool></property></widget></item>
             <item><widget class="QCheckBox" name="check_l2b"><property name="text"><string>L2B - Canopy Cover</string></property></widget></item>
             <item><widget class="QCheckBox" name="check_l4a"><property name="text"><string>L4A - Biomass</string></property></widget></item>
+            <item><widget class="QCheckBox" name="check_l4c"><property name="text"><string>L4C - Structural Complexity (WSCI)</string></property></widget></item>
            </layout>
           </item>
           <item>
@@ -148,9 +149,10 @@
               <item row="1" column="3"><widget class="QCheckBox" name="chk_l2a_rh70"><property name="text"><string>rh70</string></property></widget></item>
               <item row="2" column="0"><widget class="QCheckBox" name="chk_l2a_rh75"><property name="text"><string>rh75</string></property><property name="checked"><bool>true</bool></property></widget></item>
               <item row="2" column="1"><widget class="QCheckBox" name="chk_l2a_rh80"><property name="text"><string>rh80</string></property></widget></item>
-              <item row="2" column="2"><widget class="QCheckBox" name="chk_l2a_rh95"><property name="text"><string>rh95</string></property></widget></item>
-              <item row="2" column="3"><widget class="QCheckBox" name="chk_l2a_rh98"><property name="text"><string>rh98</string></property><property name="checked"><bool>true</bool></property></widget></item>
-              <item row="3" column="0"><widget class="QCheckBox" name="chk_l2a_rh100"><property name="text"><string>rh100</string></property></widget></item>
+              <item row="2" column="2"><widget class="QCheckBox" name="chk_l2a_rh90"><property name="text"><string>rh90</string></property></widget></item>
+              <item row="2" column="3"><widget class="QCheckBox" name="chk_l2a_rh95"><property name="text"><string>rh95</string></property></widget></item>
+              <item row="3" column="0"><widget class="QCheckBox" name="chk_l2a_rh98"><property name="text"><string>rh98</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="3" column="1"><widget class="QCheckBox" name="chk_l2a_rh100"><property name="text"><string>rh100</string></property><property name="checked"><bool>true</bool></property></widget></item>
              </layout>
             </widget>
            </item>
@@ -237,6 +239,34 @@
           </layout>
          </widget>
 
+         <!-- Sub-tab L4C -->
+         <widget class="QWidget" name="tab_vars_l4c">
+          <attribute name="title"><string>L4C - WSCI</string></attribute>
+          <layout class="QVBoxLayout" name="vLayoutL4CVars">
+           <item>
+            <layout class="QHBoxLayout">
+             <item><widget class="QPushButton" name="btn_l4c_all"><property name="text"><string>Select all</string></property><property name="maximumWidth"><number>100</number></property></widget></item>
+             <item><widget class="QPushButton" name="btn_l4c_none"><property name="text"><string>Clear</string></property><property name="maximumWidth"><number>100</number></property></widget></item>
+             <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="grp_l4c_vars">
+             <property name="title"><string>L4C variables (Waveform Structural Complexity Index)</string></property>
+             <layout class="QGridLayout" name="gridL4CVars">
+              <item row="0" column="0"><widget class="QCheckBox" name="chk_l4c_wsci"><property name="text"><string>wsci</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="0" column="1"><widget class="QCheckBox" name="chk_l4c_wsci_quality_flag"><property name="text"><string>wsci_quality_flag</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="1" column="0"><widget class="QCheckBox" name="chk_l4c_wsci_pi_lower"><property name="text"><string>wsci_pi_lower</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="1" column="1"><widget class="QCheckBox" name="chk_l4c_wsci_pi_upper"><property name="text"><string>wsci_pi_upper</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="2" column="0"><widget class="QCheckBox" name="chk_l4c_wsci_xy"><property name="text"><string>wsci_xy</string></property></widget></item>
+              <item row="2" column="1"><widget class="QCheckBox" name="chk_l4c_wsci_z"><property name="text"><string>wsci_z</string></property></widget></item>
+             </layout>
+            </widget>
+           </item>
+           <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property></spacer></item>
+          </layout>
+         </widget>
+
 
         </widget>
        </item>
@@ -263,6 +293,8 @@
           <item row="1" column="1"><widget class="QSpinBox" name="spin_l2b_quality"><property name="minimum"><number>0</number></property><property name="maximum"><number>1</number></property><property name="value"><number>1</number></property></widget></item>
           <item row="2" column="0"><widget class="QLabel"><property name="text"><string>L4A l4_quality_flag &gt;=</string></property></widget></item>
           <item row="2" column="1"><widget class="QSpinBox" name="spin_l4a_quality"><property name="minimum"><number>0</number></property><property name="maximum"><number>1</number></property><property name="value"><number>1</number></property></widget></item>
+          <item row="3" column="0"><widget class="QLabel"><property name="text"><string>L4C wsci_quality_flag &gt;=</string></property></widget></item>
+          <item row="3" column="1"><widget class="QSpinBox" name="spin_l4c_quality"><property name="minimum"><number>0</number></property><property name="maximum"><number>1</number></property><property name="value"><number>1</number></property></widget></item>
          </layout>
         </widget>
        </item>
@@ -285,6 +317,7 @@
             <item><widget class="QCheckBox" name="chk_sens_l2a"><property name="text"><string>L2A</string></property><property name="checked"><bool>true</bool></property></widget></item>
             <item><widget class="QCheckBox" name="chk_sens_l2b"><property name="text"><string>L2B</string></property><property name="checked"><bool>true</bool></property></widget></item>
             <item><widget class="QCheckBox" name="chk_sens_l4a"><property name="text"><string>L4A</string></property><property name="checked"><bool>true</bool></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_sens_l4c"><property name="text"><string>L4C</string></property><property name="checked"><bool>true</bool></property></widget></item>
            </layout>
           </item>
          </layout>
@@ -307,7 +340,7 @@
            <layout class="QHBoxLayout">
             <item><widget class="QCheckBox" name="chk_surf_land"><property name="text"><string>Land (1)</string></property><property name="checked"><bool>true</bool></property></widget></item>
             <item><widget class="QCheckBox" name="chk_surf_water"><property name="text"><string>Water (2)</string></property></widget></item>
-            <item><widget class="QCheckBox" name="chk_surf_all"><property name="text"><string>All</string></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_surf_all"><property name="text"><string>All</string></property><property name="checked"><bool>false</bool></property></widget></item>
            </layout>
           </item>
          </layout>
@@ -383,7 +416,48 @@
           <item row="0" column="1"><widget class="QLineEdit" name="earthdata_user_edit"/></item>
           <item row="1" column="0"><widget class="QLabel" name="label_earthdata_pass"><property name="text"><string>Password:</string></property></widget></item>
           <item row="1" column="1"><widget class="QLineEdit" name="earthdata_pass_edit"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
-          <item row="2" column="1"><widget class="QCheckBox" name="keep_login_check"><property name="text"><string>Keep login (save netrc)</string></property></widget></item>
+          <item row="2" column="1"><widget class="QCheckBox" name="keep_login_check"><property name="text"><string>Remember me</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="tokenGroup">
+         <property name="title"><string>Bearer Token (for university / restricted networks)</string></property>
+         <layout class="QFormLayout" name="formLayoutToken">
+          <item row="0" column="0"><widget class="QLabel" name="lbl_token"><property name="text"><string>Token:</string></property></widget></item>
+          <item row="0" column="1"><widget class="QLineEdit" name="earthdata_token_edit"><property name="echoMode"><enum>QLineEdit::Password</enum></property><property name="placeholderText"><string>Paste token — or leave empty to use username/password</string></property></widget></item>
+          <item row="1" column="1"><widget class="QLabel" name="lbl_token_hint"><property name="text"><string>Get a free token at: urs.earthdata.nasa.gov/user_tokens</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <!-- PROXY GROUP -->
+       <item>
+        <widget class="QGroupBox" name="proxyGroup">
+         <property name="title"><string>Network (optional — only if downloads fail)</string></property>
+         <layout class="QFormLayout" name="formLayoutProxy">
+          <item row="0" column="0"><widget class="QLabel" name="label_proxy_url"><property name="text"><string>Proxy URL:</string></property></widget></item>
+          <item row="0" column="1"><widget class="QLineEdit" name="proxy_url_edit"><property name="placeholderText"><string>http://proxy.university.edu:8080  (leave empty for auto-detect)</string></property></widget></item>
+          <item row="1" column="0"><widget class="QLabel" name="label_proxy_user"><property name="text"><string>Proxy user:</string></property></widget></item>
+          <item row="1" column="1"><widget class="QLineEdit" name="proxy_user_edit"/></item>
+          <item row="2" column="0"><widget class="QLabel" name="label_proxy_pass"><property name="text"><string>Proxy password:</string></property></widget></item>
+          <item row="2" column="1"><widget class="QLineEdit" name="proxy_pass_edit"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
+          <item row="3" column="1">
+           <widget class="QLabel" name="lbl_auth_status">
+            <property name="text"><string>Click "Run" — auth mode is detected automatically.</string></property>
+            <property name="wordWrap"><bool>true</bool></property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <!-- hidden compat widgets required by code -->
+       <item>
+        <widget class="QWidget" name="compat_widget">
+         <property name="visible"><bool>false</bool></property>
+         <layout class="QVBoxLayout" name="compatLayout">
+          <item><widget class="QCheckBox" name="chk_proxy_auto"><property name="checked"><bool>true</bool></property></widget></item>
+          <item><widget class="QCheckBox" name="chk_proxy_manual"/></item>
+          <item><widget class="QPushButton" name="btn_test_connection"><property name="text"><string>test</string></property></widget></item>
          </layout>
         </widget>
        </item>
