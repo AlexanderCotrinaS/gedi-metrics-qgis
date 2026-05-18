@@ -172,7 +172,6 @@ See the [LICENSE](gedi_metrics/LICENSE) file for details.
 If you use GEDIMetrics in your research, please cite:
 
 ```
-Cotrina-Sanchez, A. (2026). GEDIMetrics: A QGIS Plugin for Multi-Product
-GEDI LiDAR Data Acquisition, Subsetting, and Integration (v1.0.2).
-Available at: https://github.com/AlexanderCotrinaS/gedi-metrics-qgis
+Cotrina-Sanchez, A. et al (2026). GEDIMetrics: a QGIS plugin for accessing and integrating multi-product GEDI spaceborne LiDAR data.
+eartharxiv preprint: https://doi.org/10.31223/X5M48D
 ```
