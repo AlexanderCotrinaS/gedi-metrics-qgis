@@ -3,11 +3,11 @@ name=GEDIMetrics
 qgisMinimumVersion=3.4
 qgisMaximumVersion=4.99
 description=Download, subset and merge GEDI products (L2A, L2B, L4A, L4C) into a single GeoPackage with selectable variables and filters.
-version=1.0.2
+version=1.0.3
 author=Alexander Cotrina-Sanchez
 email=alexander.cotrina.sanchez@gmail.com
 
-about=GEDIMetrics downloads GEDI LiDAR data from NASA EarthData, subsets it to a user-defined area of interest, merges multiple products (L2A canopy height, L2B vertical structure, L4A aboveground biomass density, L4C waveform structural complexity index) by shot_number, and exports the result as GeoPackage or GeoParquet with user-selected variables and quality filters. Compatible with QGIS 3.4 and 4.0.
+about=GEDIMetrics downloads GEDI LiDAR data from NASA EarthData, subsets it to a user-defined area of interest, merges multiple products (L2A canopy height, L2B vertical structure, L4A aboveground biomass density, L4C waveform structural complexity index) by shot_number, and exports the result as GeoPackage or GeoParquet with user-selected variables and quality filters. Compatible with QGIS 3.4 and 4.0. Related preprint: https://eartharxiv.org/repository/view/13082/
 
 tracker=https://github.com/AlexanderCotrinaS/gedi-metrics-qgis/issues
 repository=https://github.com/AlexanderCotrinaS/gedi-metrics-qgis
@@ -17,6 +17,6 @@ tags=python, GEDI, LiDAR, forest, biomass, canopy, WSCI, structural complexity, 
 homepage=https://github.com/AlexanderCotrinaS/gedi-metrics-qgis
 category=Plugins
 icon=icon.png
-experimental=True
+experimental=False
 deprecated=False
 server=False

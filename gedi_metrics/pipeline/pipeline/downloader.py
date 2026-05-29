@@ -38,6 +38,25 @@ RETRY_BACKOFF     = 1.5
 RETRY_STATUS_LIST = [429, 500, 502, 503, 504]
 
 
+def _make_retry():
+    """Build a Retry object compatible with both old and new urllib3.
+
+    urllib3 >= 1.26 renamed ``method_whitelist`` to ``allowed_methods``.
+    Older versions (shipped with some macOS / system Pythons) only accept
+    the former. We try the modern name first and fall back silently.
+    """
+    common = dict(
+        total=RETRY_TOTAL,
+        backoff_factor=RETRY_BACKOFF,
+        status_forcelist=RETRY_STATUS_LIST,
+        raise_on_status=False,
+    )
+    try:
+        return Retry(allowed_methods=["GET", "HEAD"], **common)
+    except TypeError:
+        return Retry(method_whitelist=["GET", "HEAD"], **common)
+
+
 # ── Connectivity probe ─────────────────────────────────────────────────────────
 def _check_host_reachable(host: str, port: int = 443,
                           timeout: int = PREFLIGHT_TIMEOUT) -> bool:
@@ -91,11 +110,7 @@ class SessionToken(requests.Session):
             self.proxies.update(proxy_dict)
             print(f"[Downloader] Proxy: {list(proxy_dict.values())[0]}")
 
-        retry = Retry(
-            total=RETRY_TOTAL, backoff_factor=RETRY_BACKOFF,
-            status_forcelist=RETRY_STATUS_LIST,
-            allowed_methods=["GET", "HEAD"], raise_on_status=False,
-        )
+        retry = _make_retry()
         adapter = HTTPAdapter(max_retries=retry)
         self.mount("https://", adapter)
         self.mount("http://",  adapter)
@@ -132,11 +147,7 @@ class SessionNASA(requests.Session):
         if proxy_dict:
             self.proxies.update(proxy_dict)
 
-        retry = Retry(
-            total=RETRY_TOTAL, backoff_factor=RETRY_BACKOFF,
-            status_forcelist=RETRY_STATUS_LIST,
-            allowed_methods=["GET", "HEAD"], raise_on_status=False,
-        )
+        retry = _make_retry()
         adapter = HTTPAdapter(max_retries=retry)
         self.mount("https://", adapter)
         self.mount("http://",  adapter)
