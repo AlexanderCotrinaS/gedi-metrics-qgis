@@ -28,13 +28,13 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 # ── Timeout constants ──────────────────────────────────────────────────────────
-CONNECT_TIMEOUT   = 20
-READ_TIMEOUT      = 360
+CONNECT_TIMEOUT = 20
+READ_TIMEOUT = 360
 PREFLIGHT_TIMEOUT = 8
 
 # ── Retry constants ────────────────────────────────────────────────────────────
-RETRY_TOTAL       = 5
-RETRY_BACKOFF     = 1.5
+RETRY_TOTAL = 5
+RETRY_BACKOFF = 1.5
 RETRY_STATUS_LIST = [429, 500, 502, 503, 504]
 
 
@@ -113,7 +113,7 @@ class SessionToken(requests.Session):
         retry = _make_retry()
         adapter = HTTPAdapter(max_retries=retry)
         self.mount("https://", adapter)
-        self.mount("http://",  adapter)
+        self.mount("http://", adapter)
 
     def get(self, url, **kwargs):
         kwargs.setdefault("timeout", (CONNECT_TIMEOUT, READ_TIMEOUT))
@@ -150,7 +150,7 @@ class SessionNASA(requests.Session):
         retry = _make_retry()
         adapter = HTTPAdapter(max_retries=retry)
         self.mount("https://", adapter)
-        self.mount("http://",  adapter)
+        self.mount("http://", adapter)
 
     def _load_credentials(self, username, password):
         if username and password:
@@ -167,7 +167,7 @@ class SessionNASA(requests.Session):
                     print(f"[Auth] Could not parse {path}: {exc}")
         print("[Downloader] No .netrc credentials — prompting.")
         user = input("EarthData username : ")
-        pwd  = getpass.getpass("EarthData password : ")
+        pwd = getpass.getpass("EarthData password : ")
         return user, pwd
 
     def get(self, url, **kwargs):
@@ -175,10 +175,10 @@ class SessionNASA(requests.Session):
         return super().get(url, **kwargs)
 
     def rebuild_auth(self, prepared_request, response):
-        headers    = prepared_request.headers
-        url        = prepared_request.url
+        headers = prepared_request.headers
+        url = prepared_request.url
         if "Authorization" in headers:
-            orig  = requests.utils.urlparse(response.request.url).hostname
+            orig = requests.utils.urlparse(response.request.url).hostname
             redir = requests.utils.urlparse(url).hostname
             if orig != redir and redir != self.AUTH_HOST and orig != self.AUTH_HOST:
                 del headers["Authorization"]
@@ -225,11 +225,11 @@ class GEDIDownloader:
             print("[Downloader] Auth mode: Bearer Token (firewall-safe).")
             print("[Downloader] Skipping URS check — token auth does not need it.")
             self.session = SessionToken(
-                token      = bearer_token.strip(),
-                proxy_url  = proxy_url,
-                proxy_user = proxy_user,
-                proxy_pass = proxy_pass,
-                proxy_auto = proxy_auto,
+                token=bearer_token.strip(),
+                proxy_url=proxy_url,
+                proxy_user=proxy_user,
+                proxy_pass=proxy_pass,
+                proxy_auto=proxy_auto,
             )
         else:
             # ── Legacy netrc/Basic auth path ───────────────────────────────────
@@ -255,12 +255,12 @@ class GEDIDownloader:
                 print("[Downloader] ✓  URS reachable — using username/password.")
 
             self.session = SessionNASA(
-                username   = username,
-                password   = password,
-                proxy_url  = proxy_url,
-                proxy_user = proxy_user,
-                proxy_pass = proxy_pass,
-                proxy_auto = proxy_auto,
+                username=username,
+                password=password,
+                proxy_url=proxy_url,
+                proxy_user=proxy_user,
+                proxy_pass=proxy_pass,
+                proxy_auto=proxy_auto,
             )
 
     # ── private ───────────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ class GEDIDownloader:
 
     # ── public ────────────────────────────────────────────────────────────────
     def download_granule(self, url: str, chunk_size_kb: int = 256) -> bool:
-        filename  = url.split("/")[-1]
+        filename = url.split("/")[-1]
         file_path = os.path.join(self.save_path, filename)
 
         if "GEDI" not in filename:

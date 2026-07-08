@@ -3,14 +3,13 @@ import sys
 import threading
 import platform
 from pathlib import Path
-from .compat import sip, CHECKED, VECTOR_LAYER_TYPE, is_deleted
+from .compat import CHECKED, VECTOR_LAYER_TYPE, is_deleted
 
 from qgis.PyQt import uic
 from qgis.PyQt import QtCore, QtWidgets
 from qgis.core import (
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
-    QgsMapLayer,
     QgsProject,
     QgsVectorLayer,
     QgsWkbTypes,
@@ -25,53 +24,64 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(
 # (widget_name, path_hdf5, rh_index_o_None)
 # ─────────────────────────────────────────────────────────────
 L2A_VARS = {
-    'chk_l2a_rh10':               ('/rh', 10),
-    'chk_l2a_rh20':               ('/rh', 20),
-    'chk_l2a_rh25':               ('/rh', 25),
-    'chk_l2a_rh30':               ('/rh', 30),
-    'chk_l2a_rh40':               ('/rh', 40),
-    'chk_l2a_rh50':               ('/rh', 50),
-    'chk_l2a_rh60':               ('/rh', 60),
-    'chk_l2a_rh70':               ('/rh', 70),
-    'chk_l2a_rh75':               ('/rh', 75),
-    'chk_l2a_rh80':               ('/rh', 80),
-    'chk_l2a_rh90':               ('/rh', 90),
-    'chk_l2a_rh95':               ('/rh', 95),
-    'chk_l2a_rh98':               ('/rh', 98),
-    'chk_l2a_rh100':              ('/rh', 100),
-    'chk_l2a_elev_lowestmode':    ('/elev_lowestmode', None),
+    'chk_l2a_rh10': ('/rh', 10),
+    'chk_l2a_rh20': ('/rh', 20),
+    'chk_l2a_rh25': ('/rh', 25),
+    'chk_l2a_rh30': ('/rh', 30),
+    'chk_l2a_rh40': ('/rh', 40),
+    'chk_l2a_rh50': ('/rh', 50),
+    'chk_l2a_rh60': ('/rh', 60),
+    'chk_l2a_rh70': ('/rh', 70),
+    'chk_l2a_rh75': ('/rh', 75),
+    'chk_l2a_rh80': ('/rh', 80),
+    'chk_l2a_rh90': ('/rh', 90),
+    'chk_l2a_rh95': ('/rh', 95),
+    'chk_l2a_rh98': ('/rh', 98),
+    'chk_l2a_rh100': ('/rh', 100),
+    'chk_l2a_elev_lowestmode': ('/elev_lowestmode', None),
     'chk_l2a_elev_highestreturn': ('/elev_highestreturn', None),
-    'chk_l2a_sensitivity':        ('/sensitivity', None),
-    'chk_l2a_solar_elevation':    ('/solar_elevation', None),
-    'chk_l2a_dem':                ('/digital_elevation_model', None),
-    'chk_l2a_num_detectedmodes':  ('/num_detectedmodes', None),
+    'chk_l2a_sensitivity': ('/sensitivity', None),
+    'chk_l2a_solar_elevation': ('/solar_elevation', None),
+    'chk_l2a_dem': ('/digital_elevation_model', None),
+    'chk_l2a_num_detectedmodes': ('/num_detectedmodes', None),
     'chk_l2a_selected_algorithm': ('/selected_algorithm', None),
+    'chk_l2a_phenology_phase': ('/land_cover_data/phenology_phase', None),
+    'chk_l2a_phenology_year': ('/land_cover_data/phenology_year', None),
+    'chk_l2a_worldcover_class': ('/land_cover_data/worldcover_class', None),
 }
 
 L2B_VARS = {
-    'chk_l2b_cover':              ('/cover', None),
-    'chk_l2b_cover_z':            ('/cover_z', None),
-    'chk_l2b_pai':                ('/pai', None),
-    'chk_l2b_pai_z':              ('/pai_z', None),
-    'chk_l2b_fhd_normal':         ('/fhd_normal', None),
-    'chk_l2b_rh100':              ('/rh100', None),
-    'chk_l2b_pavd_z':             ('/pavd_z', None),
-    'chk_l2b_pgap_theta':         ('/pgap_theta', None),
-    'chk_l2b_rhov':               ('/rhov', None),
-    'chk_l2b_rhog':               ('/rhog', None),
-    'chk_l2b_sensitivity':        ('/sensitivity', None),
-    'chk_l2b_solar_elevation':    ('/geolocation/solar_elevation', None),
+    'chk_l2b_cover': ('/cover', None),
+    'chk_l2b_cover_z': ('/cover_z', None),
+    'chk_l2b_pai': ('/pai', None),
+    'chk_l2b_pai_z': ('/pai_z', None),
+    'chk_l2b_fhd_normal': ('/fhd_normal', None),
+    'chk_l2b_rh100': ('/rh100', None),
+    'chk_l2b_pavd_z': ('/pavd_z', None),
+    'chk_l2b_pgap_theta': ('/pgap_theta', None),
+    'chk_l2b_rhov': ('/rhov', None),
+    'chk_l2b_rhog': ('/rhog', None),
+    'chk_l2b_sensitivity': ('/sensitivity', None),
+    'chk_l2b_solar_elevation': ('/geolocation/solar_elevation', None),
+    'chk_l2b_rch25': ('/rch', 25),
+    'chk_l2b_rch50': ('/rch', 50),
+    'chk_l2b_rch75': ('/rch', 75),
+    'chk_l2b_rch98': ('/rch', 98),
+    'chk_l2b_rch100': ('/rch', 100),
+    'chk_l2b_phenology_phase': ('/land_cover_data/phenology_phase', None),
+    'chk_l2b_phenology_year': ('/land_cover_data/phenology_year', None),
+    'chk_l2b_worldcover_class': ('/land_cover_data/worldcover_class', None),
 }
 
 L4A_VARS = {
-    'chk_l4a_agbd':               ('/agbd', None),
-    'chk_l4a_agbd_se':            ('/agbd_se', None),
-    'chk_l4a_agbd_t':             ('/agbd_t', None),
-    'chk_l4a_agbd_t_se':          ('/agbd_t_se', None),
-    'chk_l4a_sensitivity':        ('/sensitivity', None),
-    'chk_l4a_solar_elevation':    ('/solar_elevation', None),
-    'chk_l4a_elev_lowestmode':    ('/elev_lowestmode', None),
-    'chk_l4a_num_detectedmodes':  ('/num_detectedmodes', None),
+    'chk_l4a_agbd': ('/agbd', None),
+    'chk_l4a_agbd_se': ('/agbd_se', None),
+    'chk_l4a_agbd_t': ('/agbd_t', None),
+    'chk_l4a_agbd_t_se': ('/agbd_t_se', None),
+    'chk_l4a_sensitivity': ('/sensitivity', None),
+    'chk_l4a_solar_elevation': ('/solar_elevation', None),
+    'chk_l4a_elev_lowestmode': ('/elev_lowestmode', None),
+    'chk_l4a_num_detectedmodes': ('/num_detectedmodes', None),
     'chk_l4a_selected_algorithm': ('/selected_algorithm', None),
 }
 
@@ -82,14 +92,13 @@ L4A_VARS = {
 # principal (BASE_FIELDS), pero se mantiene aquí también por si el usuario quiere
 # verla en la tabla aunque el filtro esté en 0.
 L4C_VARS = {
-    'chk_l4c_wsci':               ('/wsci', None),
-    'chk_l4c_wsci_pi_lower':      ('/wsci_pi_lower', None),
-    'chk_l4c_wsci_pi_upper':      ('/wsci_pi_upper', None),
-    'chk_l4c_wsci_xy':            ('/wsci_xy', None),
-    'chk_l4c_wsci_z':             ('/wsci_z', None),
-    'chk_l4c_wsci_quality_flag':  ('/wsci_quality_flag', None),
+    'chk_l4c_wsci': ('/wsci', None),
+    'chk_l4c_wsci_pi_lower': ('/wsci_pi_lower', None),
+    'chk_l4c_wsci_pi_upper': ('/wsci_pi_upper', None),
+    'chk_l4c_wsci_xy': ('/wsci_xy', None),
+    'chk_l4c_wsci_z': ('/wsci_z', None),
+    'chk_l4c_wsci_quality_flag': ('/wsci_quality_flag', None),
 }
-
 
 
 # ─────────────────────────────────────────────────────────────
@@ -98,10 +107,12 @@ L4C_VARS = {
 class StreamToSignal:
     def __init__(self, signal):
         self.signal = signal
+
     def write(self, text):
         text = text.strip()
         if text:
             self.signal.emit(text)
+
     def flush(self):
         pass
 
@@ -110,13 +121,13 @@ class StreamToSignal:
 # PipelineWorker
 # ─────────────────────────────────────────────────────────────
 class PipelineWorker(QtCore.QObject):
-    log      = QtCore.pyqtSignal(str)
+    log = QtCore.pyqtSignal(str)
     finished = QtCore.pyqtSignal(bool, list, str)
 
     def __init__(self, params, plugin_dir, cancel_event):
         super().__init__()
-        self.params       = params
-        self.plugin_dir   = plugin_dir
+        self.params = params
+        self.plugin_dir = plugin_dir
         self.cancel_event = cancel_event
 
     @QtCore.pyqtSlot()
@@ -125,7 +136,7 @@ class PipelineWorker(QtCore.QObject):
         sys.stdout = StreamToSignal(self.log)
         sys.stderr = StreamToSignal(self.log)
         try:
-            roi      = self._compute_roi()
+            roi = self._compute_roi()
             self._prepare_netrc()
             proxy_desc = self._describe_proxy()
             self.log.emit(f"[GEDIMetrics] Network  : {proxy_desc}")
@@ -155,28 +166,28 @@ class PipelineWorker(QtCore.QObject):
 
         from .pipeline.pipeline.pipeline import GEDIPipeline
         return GEDIPipeline(
-            out_directory    = self.params["output_dir"],
-            products         = self.params["products"],
-            version          = self.params["version"],
-            date_start       = self.params["start_date"],
-            date_end         = self.params["end_date"],
-            recurring_months = self.params["recurring_months"],
-            roi              = roi,
-            beams            = self.params["beams"],
-            selected_vars    = self.params["selected_vars"],
-            filters          = self.params["filters"],
-            merge_how        = self.params["merge_how"],
-            out_gpkg         = self.params["out_gpkg"],
-            out_parquet      = self.params["out_parquet"],
-            persist_login    = self.params["keep_login"],
-            keep_original_file = self.params["keep_original"],
-            cancel_event     = self.cancel_event,
-            roi_path         = self.params.get("polygon_source") or None,
-            bearer_token     = self.params.get("earthdata_token") or None,
-            proxy_url        = self.params.get("proxy_url") or None,
-            proxy_user       = self.params.get("proxy_user") or None,
-            proxy_pass       = self.params.get("proxy_pass") or None,
-            proxy_auto       = self.params.get("proxy_auto", True),
+            out_directory=self.params["output_dir"],
+            products=self.params["products"],
+            version=self.params["version"],
+            date_start=self.params["start_date"],
+            date_end=self.params["end_date"],
+            recurring_months=self.params["recurring_months"],
+            roi=roi,
+            beams=self.params["beams"],
+            selected_vars=self.params["selected_vars"],
+            filters=self.params["filters"],
+            merge_how=self.params["merge_how"],
+            out_gpkg=self.params["out_gpkg"],
+            out_parquet=self.params["out_parquet"],
+            persist_login=self.params["keep_login"],
+            keep_original_file=self.params["keep_original"],
+            cancel_event=self.cancel_event,
+            roi_path=self.params.get("polygon_source") or None,
+            bearer_token=self.params.get("earthdata_token") or None,
+            proxy_url=self.params.get("proxy_url") or None,
+            proxy_user=self.params.get("proxy_user") or None,
+            proxy_pass=self.params.get("proxy_pass") or None,
+            proxy_auto=self.params.get("proxy_auto", True),
         )
 
     def _describe_proxy(self):
@@ -193,7 +204,7 @@ class PipelineWorker(QtCore.QObject):
 
     def _prepare_netrc(self):
         user = self.params["earthdata_user"]
-        pwd  = self.params["earthdata_pass"]
+        pwd = self.params["earthdata_pass"]
         if not user or not pwd:
             return
         content = f"machine urs.earthdata.nasa.gov login {user} password {pwd}\n"
@@ -203,15 +214,17 @@ class PipelineWorker(QtCore.QObject):
         for p in netrc_files:
             try:
                 p.write_text(content)
-                try: p.chmod(0o600)
-                except Exception: pass
+                try:
+                    p.chmod(0o600)
+                except Exception:
+                    pass
                 self.log.emit(f"[Auth] Credentials saved to {p}")
             except Exception as e:
                 self.log.emit(f"[Auth] Could not write {p}: {e}")
 
     def _compute_roi(self):
         layer_id = self.params["polygon_layer_id"]
-        layer    = QgsProject.instance().mapLayer(layer_id) if layer_id else None
+        layer = QgsProject.instance().mapLayer(layer_id) if layer_id else None
         if not layer:
             raise RuntimeError("No polygon layer selected.")
         if self.params["selected_features_only"] and layer.selectedFeatureCount() > 0:
@@ -222,7 +235,7 @@ class PipelineWorker(QtCore.QObject):
             extent = layer.extent()
         if not extent.isFinite():
             raise RuntimeError("Layer extent is not valid.")
-        crs_src  = layer.crs()
+        crs_src = layer.crs()
         crs_dest = QgsCoordinateReferenceSystem("EPSG:4326")
         if crs_src != crs_dest:
             transform = QgsCoordinateTransform(
@@ -252,14 +265,15 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
     def __init__(self, parent=None, plugin_dir=None):
         super().__init__(parent)
         self.setupUi(self)
-        self.plugin_dir    = plugin_dir or os.path.dirname(__file__)
+        self.plugin_dir = plugin_dir or os.path.dirname(__file__)
         self._worker_thread = None
-        self._cancel_event  = threading.Event()
+        self._cancel_event = threading.Event()
 
         self._init_polygon_menu()
         self.populate_polygon_layers()
         self._connect_signals()
         self._update_product_tabs()
+        self._update_version_lock()   # sync version combo with initial product state
 
         # Establecer fecha de fin como hoy por defecto
         from qgis.PyQt.QtCore import QDate
@@ -267,6 +281,7 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
 
         # Restore saved settings
         self._load_settings()
+        self._update_version_lock()   # re-sync after settings restore
         # Auto-detect network → update status label
         self._detect_and_update_status()
 
@@ -304,12 +319,12 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
 
     def _detect_and_update_status(self):
         """Silent TCP probe — updates lbl_auth_status with one line."""
-        import socket
+        import socket  # noqa: F401
         from qgis.PyQt.QtCore import QTimer
         QTimer.singleShot(300, self._run_probe)
 
     def _run_probe(self):
-        import socket
+        import socket  # noqa: F401
         token = self.earthdata_token_edit.text().strip()
         if token:
             self.lbl_auth_status.setText(
@@ -338,11 +353,15 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         self.polygon_layer_combo.currentIndexChanged.connect(
             self.on_polygon_layer_changed)
 
-        # Productos → actualizar pestañas Variables
+        # Productos → actualizar pestañas Variables + version lock
         self.check_l2a.stateChanged.connect(self._update_product_tabs)
         self.check_l2b.stateChanged.connect(self._update_product_tabs)
         self.check_l4a.stateChanged.connect(self._update_product_tabs)
         self.check_l4c.stateChanged.connect(self._update_product_tabs)
+        self.check_l2a.stateChanged.connect(self._update_version_lock)
+        self.check_l2b.stateChanged.connect(self._update_version_lock)
+        self.check_l4a.stateChanged.connect(self._update_version_lock)
+        self.check_l4c.stateChanged.connect(self._update_version_lock)
 
         # Select all / Clear
         self.btn_l2a_all.clicked.connect(lambda: self._set_all_vars('l2a', True))
@@ -362,6 +381,12 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         # Defaults orientados a calidad: quality_flag>=1, exclude degraded
         # footprints, y restringir a superficie terrestre (Land=1). El usuario
         # puede relajar estos filtros si necesita máxima cobertura.
+        # Version combo: populate V003 and V002, default to V003
+        self.version_combo.clear()
+        self.version_combo.addItem('003')
+        self.version_combo.addItem('002')
+        self.version_combo.setCurrentText('003')
+
         self.spin_l2a_quality.setValue(1)
         self.spin_l2b_quality.setValue(1)
         self.spin_l4a_quality.setValue(1)
@@ -376,6 +401,21 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         self.tabWidgetVars.setTabEnabled(1, self.check_l2b.isChecked())
         self.tabWidgetVars.setTabEnabled(2, self.check_l4a.isChecked())
         self.tabWidgetVars.setTabEnabled(3, self.check_l4c.isChecked())
+
+    def _update_version_lock(self):
+        """Inform the user when products are routed to V002 regardless of the
+        version selector. The version combo stays enabled; the pipeline resolves
+        the effective version per product.
+        """
+        if self.check_l4a.isChecked() or self.check_l4c.isChecked():
+            self.label_version.setToolTip(
+                'L4A and L4C use V002 for now. '
+                'L2A and L2B use the selected version.')
+            self.version_combo.setToolTip(
+                'L4A/L4C will use V002 regardless of this setting.')
+        else:
+            self.label_version.setToolTip('')
+            self.version_combo.setToolTip('')
 
     def _set_all_vars(self, product, state):
         catalog = {'l2a': L2A_VARS, 'l2b': L2B_VARS,
@@ -429,17 +469,17 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         self.polygon_layer_combo.blockSignals(True)
         self.polygon_layer_combo.clear()
         layers = [
-            l for l in QgsProject.instance().mapLayers().values()
-            if l.type() == VECTOR_LAYER_TYPE
-            and QgsWkbTypes.geometryType(l.wkbType()) == QgsWkbTypes.PolygonGeometry
+            lyr for lyr in QgsProject.instance().mapLayers().values()
+            if lyr.type() == VECTOR_LAYER_TYPE
+            and QgsWkbTypes.geometryType(lyr.wkbType()) == QgsWkbTypes.PolygonGeometry
         ]
         if not layers:
             self.polygon_layer_combo.addItem("No polygon layers found", None)
             self.polygon_layer_combo.setEnabled(False)
         else:
             self.polygon_layer_combo.setEnabled(True)
-            for l in layers:
-                self.polygon_layer_combo.addItem(l.name(), l.id())
+            for lyr in layers:
+                self.polygon_layer_combo.addItem(lyr.name(), lyr.id())
             if current_id:
                 idx = self.polygon_layer_combo.findData(current_id)
                 if idx != -1:
@@ -448,7 +488,7 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         self.on_polygon_layer_changed()
 
     def on_polygon_layer_changed(self):
-        lid   = self.polygon_layer_combo.currentData()
+        lid = self.polygon_layer_combo.currentData()
         layer = QgsProject.instance().mapLayer(lid) if lid else None
         self.polygon_path_lineedit.setText(layer.source() if layer else "")
 
@@ -458,7 +498,7 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
             "Vector files (*.shp *.gpkg);;All files (*)")
         if not path:
             return
-        name  = os.path.splitext(os.path.basename(path))[0]
+        name = os.path.splitext(os.path.basename(path))[0]
         layer = QgsVectorLayer(path, name, "ogr")
         if not layer.isValid():
             QtWidgets.QMessageBox.critical(
@@ -486,13 +526,14 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
     def _on_test_connection(self):
         """Quick TCP probe to urs.earthdata.nasa.gov — runs in the UI thread
         (it's fast: 8 s max).  Updates the status label with the result."""
-        import socket
-        self.lbl_connection_status.setText("Testing...")
+        import socket  # noqa: F401
+        status_label = getattr(self, "lbl_connection_status", self.lbl_auth_status)
+        status_label.setText("Testing...")
         QtWidgets.QApplication.processEvents()
         try:
             sock = socket.create_connection(("urs.earthdata.nasa.gov", 443), timeout=8)
             sock.close()
-            self.lbl_connection_status.setText(
+            status_label.setText(
                 "✓  Connected — direct access works.")
         except (socket.timeout, OSError):
             # Try a basic requests GET through the configured proxy
@@ -503,19 +544,19 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
                     "https://urs.earthdata.nasa.gov",
                     proxies=proxies if proxies else None,
                     timeout=(8, 10))
-                self.lbl_connection_status.setText(
+                status_label.setText(
                     f"✓  Connected via proxy (HTTP {r.status_code}).")
             except Exception as exc:
-                self.lbl_connection_status.setText(
+                status_label.setText(
                     f"✗  Failed: {exc}\n"
                     "  Try enabling Auto-detect or enter proxy manually.")
 
     def _collect_proxy_dict(self):
         """Build proxy dict from current GUI state (mirrors downloader logic)."""
         if self.chk_proxy_manual.isChecked():
-            url  = self.proxy_url_edit.text().strip()
+            url = self.proxy_url_edit.text().strip()
             user = self.proxy_user_edit.text().strip()
-            pwd  = self.proxy_pass_edit.text()
+            pwd = self.proxy_pass_edit.text()
             if url:
                 if user and pwd:
                     from urllib.parse import urlparse
@@ -530,10 +571,14 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
     # ── Recolectar parámetros ─────────────────────────────────
     def collect_parameters(self):
         products = []
-        if self.check_l2a.isChecked(): products.append('GEDI02_A')
-        if self.check_l2b.isChecked(): products.append('GEDI02_B')
-        if self.check_l4a.isChecked(): products.append('GEDI04_A')
-        if self.check_l4c.isChecked(): products.append('GEDI04_C')
+        if self.check_l2a.isChecked():
+            products.append('GEDI02_A')
+        if self.check_l2b.isChecked():
+            products.append('GEDI02_B')
+        if self.check_l4a.isChecked():
+            products.append('GEDI04_A')
+        if self.check_l4c.isChecked():
+            products.append('GEDI04_C')
 
         selected_vars = {
             'GEDI02_A': self._collect_vars(L2A_VARS),
@@ -544,8 +589,10 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
 
         surface_flags = []
         if not self.chk_surf_all.isChecked():
-            if self.chk_surf_land.isChecked():  surface_flags.append(1)
-            if self.chk_surf_water.isChecked(): surface_flags.append(2)
+            if self.chk_surf_land.isChecked():
+                surface_flags.append(1)
+            if self.chk_surf_water.isChecked():
+                surface_flags.append(2)
 
         filters = {
             'quality': {
@@ -555,7 +602,7 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
                 'GEDI04_C': self.spin_l4c_quality.value(),
             },
             'sensitivity': {
-                'value':    self.spin_sensitivity.value(),
+                'value': self.spin_sensitivity.value(),
                 'apply_to': {
                     'GEDI02_A': self.chk_sens_l2a.isChecked(),
                     'GEDI02_B': self.chk_sens_l2b.isChecked(),
@@ -564,7 +611,7 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
                 }
             },
             'exclude_degrade': self.chk_exclude_degrade.isChecked(),
-            'surface_flags':   surface_flags,
+            'surface_flags': surface_flags,
         }
 
         # Beams — devolver lista o None (None = todos los beams)
@@ -579,31 +626,31 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
             beams = None                      # None = todos los beams
 
         return {
-            "output_dir":             self.output_dir_lineedit.text().strip(),
-            "products":               products,
-            "version":                self.version_combo.currentText(),
-            "start_date":             self.start_date_edit.date().toString("yyyy.MM.dd"),
-            "end_date":               self.end_date_edit.date().toString("yyyy.MM.dd"),
-            "recurring_months":       self.recurring_months_check.isChecked(),
-            "polygon_layer_id":       self.polygon_layer_combo.currentData(),
-            "polygon_source":         self.polygon_path_lineedit.text().strip(),
+            "output_dir": self.output_dir_lineedit.text().strip(),
+            "products": products,
+            "version": self.version_combo.currentText(),
+            "start_date": self.start_date_edit.date().toString("yyyy.MM.dd"),
+            "end_date": self.end_date_edit.date().toString("yyyy.MM.dd"),
+            "recurring_months": self.recurring_months_check.isChecked(),
+            "polygon_layer_id": self.polygon_layer_combo.currentData(),
+            "polygon_source": self.polygon_path_lineedit.text().strip(),
             "selected_features_only": self.selected_only_check.isChecked(),
-            "selected_vars":          selected_vars,
-            "filters":                filters,
-            "merge_how":    "outer" if self.radio_merge_outer.isChecked() else "inner",
-            "out_gpkg":     self.chk_out_gpkg.isChecked(),
-            "out_parquet":  self.chk_out_parquet.isChecked(),
-            "beams":        beams,
+            "selected_vars": selected_vars,
+            "filters": filters,
+            "merge_how": "outer" if self.radio_merge_outer.isChecked() else "inner",
+            "out_gpkg": self.chk_out_gpkg.isChecked(),
+            "out_parquet": self.chk_out_parquet.isChecked(),
+            "beams": beams,
             "keep_original": self.keep_original_check.isChecked(),
             "earthdata_user": self.earthdata_user_edit.text().strip(),
             "earthdata_pass": self.earthdata_pass_edit.text(),
             "earthdata_token": self.earthdata_token_edit.text().strip(),
-            "keep_login":     self.keep_login_check.isChecked(),
-            "proxy_auto":     self.chk_proxy_auto.isChecked(),
-            "proxy_manual":   self.chk_proxy_manual.isChecked(),
-            "proxy_url":      self.proxy_url_edit.text().strip(),
-            "proxy_user":     self.proxy_user_edit.text().strip(),
-            "proxy_pass":     self.proxy_pass_edit.text(),
+            "keep_login": self.keep_login_check.isChecked(),
+            "proxy_auto": self.chk_proxy_auto.isChecked(),
+            "proxy_manual": self.chk_proxy_manual.isChecked(),
+            "proxy_url": self.proxy_url_edit.text().strip(),
+            "proxy_user": self.proxy_user_edit.text().strip(),
+            "proxy_pass": self.proxy_pass_edit.text(),
         }
 
     def _collect_vars(self, catalog):
@@ -702,8 +749,112 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
             self._load_outputs(outputs)
         else:
             self.log_text_edit.append(f"[Error] {error_message}")
+            self._show_error_guidance(error_message)
         self._worker_thread = None
         self.close_button.setText("Close")
+
+    def _show_error_guidance(self, error_message):
+        """Classify the error and provide actionable guidance to the user."""
+        err = error_message.lower()
+        guidance = []
+
+        # ── Import / DLL errors ──
+        if "no module named" in err or "importerror" in err:
+            mod = error_message.split("'")[-2] if "'" in error_message else "unknown"
+            guidance.append(
+                f"A required Python package is not available: {mod}\n\n"
+                "How to fix:\n"
+                "• Windows (OSGeo4W): Open OSGeo4W Shell →\n"
+                f"  pip install {mod}\n"
+                "• Windows (standard QGIS): Reinstall QGIS via OSGeo4W\n"
+                "  (https://trac.osgeo.org/osgeo4w/) — this is the most\n"
+                "  reliable way to get all dependencies working.\n"
+                f"• macOS: pip3 install {mod}\n"
+                f"• Linux: sudo apt install python3-{mod}")
+
+        elif "dll" in err or "library" in err or "hdf5" in err.lower():
+            guidance.append(
+                "A shared library conflict was detected (likely HDF5/GDAL).\n\n"
+                "This usually happens when QGIS is installed via the standard\n"
+                "installer instead of OSGeo4W.\n\n"
+                "How to fix:\n"
+                "1. Uninstall your current QGIS\n"
+                "2. Download OSGeo4W: https://trac.osgeo.org/osgeo4w/\n"
+                "3. Run → Advanced Install → select python3-h5py,\n"
+                "   python3-geopandas, python3-fiona\n"
+                "4. Restart QGIS and try again")
+
+        # ── Authentication errors ──
+        elif "401" in err or "unauthorized" in err or "forbidden" in err:
+            guidance.append(
+                "Authentication failed.\n\n"
+                "How to fix:\n"
+                "• Your Bearer Token may have expired.\n"
+                "  1. Go to https://urs.earthdata.nasa.gov/user_tokens\n"
+                "  2. Click 'Generate Token' (or revoke and regenerate)\n"
+                "  3. Copy the new token into GEDIMetrics → EarthData tab\n"
+                "\n"
+                "• If using username/password:\n"
+                "  Verify your credentials at https://urs.earthdata.nasa.gov")
+
+        # ── Network / connection errors ──
+        elif ("timeout" in err or "connection" in err
+              or "urlopen" in err or "proxy" in err or "ssl" in err):
+            guidance.append(
+                "A network error occurred during data download.\n\n"
+                "Possible causes and fixes:\n"
+                "• Firewall blocking NASA servers → use Bearer Token auth\n"
+                "  (EarthData tab → paste your token)\n"
+                "• Slow connection → try again (the plugin will resume\n"
+                "  from where it stopped)\n"
+                "• Proxy needed → configure proxy in the plugin settings\n"
+                "• VPN interference → try disconnecting your VPN")
+
+        # ── Permission errors ──
+        elif "permission" in err or "access" in err or "errno 13" in err:
+            guidance.append(
+                "Permission denied when writing output files.\n\n"
+                "How to fix:\n"
+                "• Choose a different output folder (e.g., your Desktop\n"
+                "  or Documents folder)\n"
+                "• Avoid writing to C:\\Program Files or system directories\n"
+                "• On macOS/Linux: check folder permissions with\n"
+                "  ls -la <your_output_folder>")
+
+        # ── Disk space ──
+        elif "no space" in err or "disk" in err or "errno 28" in err:
+            guidance.append(
+                "Not enough disk space to save the output.\n\n"
+                "GEDI granules can be large (1-2 GB each).\n"
+                "Free up disk space or choose an output folder on\n"
+                "a drive with more available space.")
+
+        # ── ROI / geometry errors ──
+        elif "polygon" in err or "roi" in err or "extent" in err:
+            guidance.append(
+                "There was a problem with your Region of Interest (ROI).\n\n"
+                "How to fix:\n"
+                "• Make sure the polygon layer is loaded in QGIS\n"
+                "• Verify the polygon has a valid geometry (no self-\n"
+                "  intersections, not empty)\n"
+                "• Try using a simpler polygon (e.g., a bounding box)")
+
+        # ── Generic fallback ──
+        if not guidance:
+            guidance.append(
+                f"An unexpected error occurred:\n{error_message}\n\n"
+                "Suggestions:\n"
+                "• Make sure QGIS is installed via OSGeo4W (Windows)\n"
+                "• Verify your EarthData credentials and internet connection\n"
+                "• Try with a smaller date range or fewer products\n"
+                "• Report this error at:\n"
+                "  https://github.com/AlexanderCotrinaS/gedi-metrics-qgis/issues")
+
+        self.log_text_edit.append("")
+        self.log_text_edit.append("═══ How to fix this error ═══")
+        for g in guidance:
+            for line in g.split("\n"):
+                self.log_text_edit.append(f"  {line}")
 
     def _load_outputs(self, outputs):
         if not outputs:
@@ -737,40 +888,210 @@ class GEDIMetricsDialog(QtWidgets.QDialog, FORM_CLASS):
         self.reject()
 
     # ── Dependencias ──────────────────────────────────────────
+    def _is_osgeo4w(self):
+        """Detect if QGIS is running under OSGeo4W (recommended on Windows)."""
+        osgeo4w_root = os.environ.get("OSGEO4W_ROOT", "")
+        qgis_prefix = os.environ.get("QGIS_PREFIX_PATH", "")
+        return bool(osgeo4w_root) or "osgeo4w" in qgis_prefix.lower()
+
+    def _try_auto_install(self, packages):
+        """Attempt to install missing packages via pip.
+
+        Returns list of packages that could NOT be installed.
+        """
+        if not packages:
+            return []
+
+        import subprocess
+
+        pip_names = {
+            "h5py": "h5py",
+            "pandas": "pandas",
+            "geopandas": "geopandas",
+            "numpy": "numpy",
+            "shapely": "shapely",
+            "requests": "requests",
+            "fiona": "fiona",
+            "rtree": "rtree",
+            "pyarrow": "pyarrow",
+        }
+
+        to_install = [pip_names.get(p, p) for p in packages]
+        print(f"[GEDIMetrics] Attempting to install: {', '.join(to_install)}")
+
+        # Show a wait dialog
+        progress = QtWidgets.QProgressDialog(
+            f"Installing dependencies: {', '.join(to_install)}...\n"
+            "This may take a minute on first run.",
+            None, 0, 0, self)
+        progress.setWindowTitle("GEDIMetrics — Installing Dependencies")
+        progress.setMinimumDuration(0)
+        progress.show()
+        QtWidgets.QApplication.processEvents()
+
+        try:
+            cmd = [sys.executable, "-m", "pip", "install",
+                   "--break-system-packages"] + to_install
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=300)
+
+            if result.returncode != 0:
+                # Retry without --break-system-packages (older pip)
+                cmd = [sys.executable, "-m", "pip", "install"] + to_install
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=300)
+
+            if result.returncode == 0:
+                print(f"[GEDIMetrics] ✓ Successfully installed: {', '.join(to_install)}")
+            else:
+                print(f"[GEDIMetrics] pip install failed:\n{result.stderr[-500:]}")
+        except Exception as e:
+            print(f"[GEDIMetrics] Auto-install error: {e}")
+        finally:
+            progress.close()
+
+        # Re-check what's still missing
+        still_missing = []
+        for mod in packages:
+            try:
+                __import__(mod)
+            except ImportError:
+                still_missing.append(mod)
+
+        if still_missing:
+            print(f"[GEDIMetrics] Still missing after install attempt: "
+                  f"{', '.join(still_missing)}")
+        return still_missing
+
     def check_dependencies(self):
-        missing, hdf5_mismatch = [], None
+        # ── Critical packages (block execution if missing) ──
+        critical_missing = []
+        for mod in ["h5py", "pandas", "geopandas", "numpy", "shapely", "requests"]:
+            try:
+                __import__(mod)
+            except ImportError:
+                critical_missing.append(mod)
+
+        # ── h5py HDF5 version check ──
+        warnings_list = []
         try:
             import h5py
-            built   = getattr(h5py.version, "hdf5_built_version", None)
+            built = getattr(h5py.version, "hdf5_built_version", None)
             runtime = getattr(h5py.version, "hdf5_version", None)
             if built and runtime and built.split(".")[:2] != runtime.split(".")[:2]:
-                hdf5_mismatch = (built, runtime)
+                warnings_list.append(
+                    f"⚠ h5py HDF5 version mismatch:\n"
+                    f"  Built with HDF5 {built}, but runtime has {runtime}.\n"
+                    f"  This may cause crashes when reading GEDI files.\n"
+                    f"  Fix: uninstall h5py and reinstall via OSGeo4W Setup\n"
+                    f"  (search 'python3-h5py' in the package list).")
         except ImportError:
-            missing.append("h5py")
-        for mod in ["pandas", "geopandas", "numpy", "shapely", "requests"]:
-            try: __import__(mod)
-            except ImportError: missing.append(mod)
+            pass  # already in critical_missing
 
-        if not missing and not hdf5_mismatch:
-            return True
+        # ── Optional packages (fiona, rtree, pyarrow) ──
+        # NOT checked here. They are used internally by geopandas or only
+        # needed for specific output formats. If they fail at runtime,
+        # the error handler (_show_error_guidance) provides clear guidance.
 
+        # ── Auto-install critical packages if missing ──
+        if critical_missing:
+            reply = QtWidgets.QMessageBox.question(
+                self, "GEDIMetrics — Missing Dependencies",
+                f"The following required packages are missing:\n"
+                f"  {', '.join(critical_missing)}\n\n"
+                f"Would you like GEDIMetrics to install them automatically?\n"
+                f"(This requires an internet connection)",
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                QtWidgets.QMessageBox.Yes)
+
+            if reply == QtWidgets.QMessageBox.Yes:
+                still_missing = self._try_auto_install(critical_missing)
+            else:
+                still_missing = critical_missing
+
+            if still_missing:
+                self._show_manual_install_guide(still_missing, warnings_list)
+                return False
+
+        # ── Show warnings if any (non-blocking) ──
+        if warnings_list:
+            msg = "\n\n".join(warnings_list)
+            reply = QtWidgets.QMessageBox.information(
+                self, "GEDIMetrics — Dependency Notes",
+                f"{msg}\n\n"
+                f"These are informational only. The plugin should work normally.\n"
+                f"Click OK to continue.")
+
+        return True
+
+    def _show_manual_install_guide(self, missing, warnings_list):
+        """Show OS-specific installation instructions when auto-install fails."""
         lines = []
-        if missing:
-            lines.append("Missing packages:\n  " + ", ".join(sorted(set(missing))))
-        if hdf5_mismatch:
-            lines.append(f"h5py/HDF5 mismatch: built={hdf5_mismatch[0]}, "
-                         f"runtime={hdf5_mismatch[1]}")
+        lines.append(
+            "❌ Could not install the following packages:\n  "
+            + ", ".join(sorted(set(missing))))
+        lines.append(
+            "Automatic installation was not possible.\n"
+            "Please install them manually using the instructions below.")
+
+        for w in warnings_list:
+            lines.append(w)
+
         os_name = platform.system()
         if os_name == "Windows":
-            lines.append("OSGeo4W Shell:\n  python -m pip install --user " +
-                         " ".join(sorted(set(missing))))
+            if self._is_osgeo4w():
+                lines.append(
+                    "═══ Manual install (OSGeo4W) ═══\n"
+                    "1. Close QGIS\n"
+                    "2. Open the OSGeo4W Shell\n"
+                    "   (Start Menu → OSGeo4W Shell)\n"
+                    "3. Run:\n"
+                    f"   pip install {' '.join(sorted(set(missing)))}\n"
+                    "4. Restart QGIS\n"
+                    "\n"
+                    "For h5py issues, prefer the OSGeo4W package:\n"
+                    "  Re-run OSGeo4W Setup → Advanced Install →\n"
+                    "  search 'python3-h5py' and mark it for installation.")
+            else:
+                lines.append(
+                    "═══ Manual install (Windows — standard QGIS) ═══\n"
+                    "Your QGIS is NOT using OSGeo4W. This is the most\n"
+                    "common cause of dependency problems on Windows.\n"
+                    "\n"
+                    "RECOMMENDED: Reinstall QGIS via OSGeo4W:\n"
+                    "  1. Download from https://trac.osgeo.org/osgeo4w/\n"
+                    "  2. Run → Advanced Install\n"
+                    "  3. Select these packages:\n"
+                    "     python3-h5py, python3-pandas,\n"
+                    "     python3-geopandas, python3-shapely,\n"
+                    "     python3-fiona, python3-requests\n"
+                    "  4. Complete installation and restart QGIS")
         elif os_name == "Darwin":
-            lines.append("macOS:\n  python -m pip install --user " +
-                         " ".join(sorted(set(missing))))
+            lines.append(
+                "═══ Manual install (macOS) ═══\n"
+                "Open Terminal and run:\n"
+                f"  pip3 install {' '.join(sorted(set(missing)))}\n"
+                "\n"
+                "If you get permission errors:\n"
+                f"  pip3 install --user {' '.join(sorted(set(missing)))}\n"
+                "\n"
+                "Then restart QGIS.")
         else:
-            lines.append("Linux:\n  sudo apt install python3-h5py "
-                         "python3-pandas python3-geopandas python3-shapely")
+            apt_names = {
+                "h5py": "python3-h5py", "pandas": "python3-pandas",
+                "geopandas": "python3-geopandas", "shapely": "python3-shapely",
+                "fiona": "python3-fiona", "rtree": "python3-rtree",
+                "requests": "python3-requests", "numpy": "python3-numpy",
+            }
+            apt_pkgs = " ".join(
+                apt_names.get(m, f"python3-{m}")
+                for m in sorted(set(missing)))
+            lines.append(
+                "═══ Manual install (Linux) ═══\n"
+                f"  sudo apt install {apt_pkgs}\n"
+                "\n"
+                "Then restart QGIS.")
 
         QtWidgets.QMessageBox.critical(
-            self, "Missing dependencies", "\n\n".join(lines))
-        return False
+            self, "GEDIMetrics — Manual Installation Required",
+            "\n\n".join(lines))

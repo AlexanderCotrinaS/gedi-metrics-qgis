@@ -1,16 +1,14 @@
 """
-GEDIMetrics — pipeline.py
+GEDIMetrics v1.0.5 — pipeline.py
 Orquesta Finder → Downloader → Subsetter (multi-producto) → Merge → Export.
 """
 
 import os
-from pathlib import Path
 import geopandas as gp
-import pandas as pd
 
-from .finder     import GEDIFinder
+from .finder import GEDIFinder
 from .downloader import GEDIDownloader
-from .subsetter  import GEDISubsetter
+from .subsetter import GEDISubsetter
 
 
 # Columnas base que NO se duplican en el merge
@@ -92,28 +90,28 @@ class GEDIPipeline:
                  proxy_pass=None,
                  proxy_auto=True):
 
-        self.out_directory      = out_directory
-        self.products           = products
-        self.version            = version
-        self.date_start         = date_start
-        self.date_end           = date_end
-        self.recurring_months   = recurring_months
-        self.roi                = [float(c) for c in roi]
-        self.beams              = beams
-        self.selected_vars      = selected_vars or {}
-        self.filters            = filters or {}
-        self.merge_how          = merge_how
-        self.out_gpkg           = out_gpkg
-        self.out_parquet        = out_parquet
-        self.persist_login      = persist_login
+        self.out_directory = out_directory
+        self.products = products
+        self.version = version
+        self.date_start = date_start
+        self.date_end = date_end
+        self.recurring_months = recurring_months
+        self.roi = [float(c) for c in roi]
+        self.beams = beams
+        self.selected_vars = selected_vars or {}
+        self.filters = filters or {}
+        self.merge_how = merge_how
+        self.out_gpkg = out_gpkg
+        self.out_parquet = out_parquet
+        self.persist_login = persist_login
         self.keep_original_file = keep_original_file
-        self.cancel_event       = cancel_event
-        self.roi_path           = roi_path
-        self.bearer_token       = bearer_token
-        self.proxy_url          = proxy_url
-        self.proxy_user         = proxy_user
-        self.proxy_pass         = proxy_pass
-        self.proxy_auto         = proxy_auto
+        self.cancel_event = cancel_event
+        self.roi_path = roi_path
+        self.bearer_token = bearer_token
+        self.proxy_url = proxy_url
+        self.proxy_user = proxy_user
+        self.proxy_pass = proxy_pass
+        self.proxy_auto = proxy_auto
 
         # ROI GeoDataFrame (polígono exacto si existe)
         self.roi_gdf = None
@@ -123,7 +121,7 @@ class GEDIPipeline:
                 clean_path = self.roi_path.split('|')[0].strip()
                 gdf = gp.read_file(clean_path)
                 gdf = gdf.to_crs(epsg=4326) if gdf.crs else \
-                      gdf.set_crs(epsg=4326)
+                    gdf.set_crs(epsg=4326)
                 self.roi_gdf = gdf
                 minx, miny, maxx, maxy = gdf.total_bounds
                 self.roi = [maxy, minx, miny, maxx]
@@ -133,6 +131,7 @@ class GEDIPipeline:
 
         os.makedirs(out_directory, exist_ok=True)
         self._final_output_path = None
+        self._run_gpkg_outputs = []
 
         # Build proxy dict once — shared by Downloader, Finder, and _derive_url
         from .downloader import _build_proxy_dict
@@ -171,12 +170,17 @@ class GEDIPipeline:
         print(f"[Pipeline] Products : {', '.join(self.products)}")
         print(f"[Pipeline] Merge    : {self.merge_how} join")
 
+        if self._date_range_has_no_acquisitions():
+            return
+
         # Encontrar granules comunes a todos los productos
         # (mismo período y bbox — el shot_number garantiza alineación)
         all_granule_links = self._find_granules()
 
         if not all_granule_links:
-            print("[Pipeline] No granules found.")
+            print("[Pipeline] No granules found. Check date range, ROI extent, "
+                  "and that latitude is within ±51.6°. Note: GEDI was offline "
+                  "from March 2023 to April 2024.")
             return
 
         # Procesar granule por granule
@@ -185,8 +189,8 @@ class GEDIPipeline:
                 break
 
             granule_name = granule_url.split("/")[-1]   # ej: GEDI02_A_2021...h5
-            h5_path      = os.path.join(self.out_directory, granule_name)
-            stem         = granule_name.replace('.h5', '')
+            h5_path = os.path.join(self.out_directory, granule_name)
+            stem = granule_name.replace('.h5', '')
 
             # Saltar si el merged ya existe
             merged_gpkg = os.path.join(self.out_directory, f"{stem}_merged.gpkg")
@@ -210,17 +214,23 @@ class GEDIPipeline:
                 print(f"[Pipeline] Removed HDF5: {granule_name}")
 
             if not gdfs:
-                print(f"[Pipeline] No data for {stem}")
+                print(f"[Pipeline] No usable data for {stem} — skipping.")
                 continue
 
             # Merge
             merged = self._merge(gdfs)
             if merged is None or len(merged) == 0:
-                print(f"[Pipeline] Empty merge for {stem}")
+                print(f"[Pipeline] Empty merge for {stem}. "
+                      f"With 'inner join', products must share shot_numbers; "
+                      f"try 'outer join' to preserve all footprints.")
                 continue
 
             # Filtro post-merge de sensitivity. No añade columnas auxiliares.
             merged = self._apply_postmerge_filter(merged)
+            if merged is None or len(merged) == 0:
+                print(f"[Pipeline] No footprints remain for {stem} after "
+                      "post-merge filters - skipping export.")
+                continue
 
             # Exportar
             self._export(merged, stem)
@@ -229,6 +239,93 @@ class GEDIPipeline:
         self._merge_final_outputs()
 
         print("[Pipeline] Done.")
+
+    # ── Per-product version resolver ─────────────────────────
+    def _date_range_has_no_acquisitions(self):
+        """Return True when the requested GEDI date range cannot contain data."""
+        try:
+            import datetime
+            start = datetime.datetime.strptime(self.date_start, "%Y.%m.%d").date()
+            end = datetime.datetime.strptime(self.date_end, "%Y.%m.%d").date()
+        except Exception:
+            return False
+
+        mission_start = datetime.date(2019, 4, 4)
+        gap_start = datetime.date(2023, 3, 17)
+        gap_end = datetime.date(2024, 4, 25)
+
+        if end < mission_start:
+            print("[Pipeline] No GEDI acquisitions before 2019-04-04.")
+            return True
+
+        if gap_start <= start and end <= gap_end:
+            print("[Pipeline] GEDI was not acquiring data from 2023-03-17 "
+                  "through 2024-04-25. Choose dates before or after that gap.")
+            return True
+
+        if start <= gap_end and end >= gap_start:
+            print("[Pipeline] Date range overlaps the GEDI acquisition gap "
+                  "(2023-03-17 to 2024-04-25); only dates outside the gap "
+                  "can return granules.")
+
+        return False
+
+    # Cache de disponibilidad V003 por producto — verificado una vez por sesión
+    _v003_availability_cache: dict = {}
+
+    def _product_version(self, product: str) -> str:
+        """Return the effective version for a given product.
+
+        - GEDI04_C: always V002 (V003 not yet released).
+        - GEDI04_A: V002 until ORNL publishes V003 granules.
+                    Checks CMR once per session; falls back to V002 if 0 granules.
+        - L2A, L2B: use self.version (user selection from UI).
+        """
+        if product == 'GEDI04_C':
+            return '002'
+
+        if product == 'GEDI04_A' and self.version == '003':
+            return self._resolve_l4a_version()
+
+        return self.version
+
+    def _resolve_l4a_version(self) -> str:
+        """Check if GEDI04_A V003 has granules within the pipeline ROI.
+        Cached per session (keyed by ROI bbox so different AOIs get independent checks).
+        Returns '003' if granules exist for this AOI, '002' otherwise.
+        """
+        # Cache key includes bbox so different AOIs don't share the result
+        ul_lat, ul_lon, lr_lat, lr_lon = self.roi
+        bbox_key = f"{ul_lon:.4f},{lr_lat:.4f},{lr_lon:.4f},{ul_lat:.4f}"
+        cache_key = f'GEDI04_A.003|{bbox_key}'
+
+        if cache_key in GEDIPipeline._v003_availability_cache:
+            return GEDIPipeline._v003_availability_cache[cache_key]
+
+        concept_id = 'C4212593885-ORNL_CLOUD'
+        try:
+            import requests as _req
+            # Query CMR restricted to the pipeline ROI bbox
+            url = (
+                f"https://cmr.earthdata.nasa.gov/search/granules.json"
+                f"?concept_id={concept_id}"
+                f"&bounding_box={bbox_key}"
+                f"&page_size=1"
+            )
+            resp = _req.get(url, proxies=self._proxies or None, timeout=(10, 20))
+            count = len(resp.json().get('feed', {}).get('entry', []))
+            if count > 0:
+                print("[Pipeline] GEDI04_A V003 granules found for this AOI — using V003.")
+                result = '003'
+            else:
+                print("[Pipeline] GEDI04_A V003: no granules for this AOI — falling back to V002.")
+                result = '002'
+        except Exception as exc:
+            print(f"[Pipeline] GEDI04_A V003 check failed ({exc}) — using V002.")
+            result = '002'
+
+        GEDIPipeline._v003_availability_cache[cache_key] = result
+        return result
 
     # ── Finder ───────────────────────────────────────────────
     def _find_granules(self):
@@ -240,16 +337,15 @@ class GEDIPipeline:
         """
         ref_product = self.products[0]
         product_name = ref_product          # ej 'GEDI02_A'
-        version      = self.version         # '002'
 
         finder = GEDIFinder(
-            product          = product_name,
-            version          = version,
-            date_start       = self.date_start,
-            date_end         = self.date_end,
-            recurring_months = self.recurring_months,
-            roi              = self.roi,
-            proxies          = self._proxies,
+            product=product_name,
+            version=self._product_version(product_name),
+            date_start=self.date_start,
+            date_end=self.date_end,
+            recurring_months=self.recurring_months,
+            roi=self.roi,
+            proxies=self._proxies,
         )
         granules = finder.find(
             output_filepath=self.out_directory,
@@ -268,7 +364,7 @@ class GEDIPipeline:
                 if ok:
                     break
             if not ok:
-                print(f"[Pipeline] Skipping after 3 failed attempts")
+                print("[Pipeline] Skipping after 3 failed attempts")
         return ok
 
     # ── Subsetter multi-producto ──────────────────────────────
@@ -290,16 +386,17 @@ class GEDIPipeline:
             # Obtener el h5 del producto correcto
             product_h5 = self._get_product_h5(h5_path, product)
             if product_h5 is None:
-                print(f"[Pipeline] Could not get HDF5 for {product}")
+                print(f"[Pipeline] {product} granule not available for this orbit — skipping.")
                 continue
 
             subsetter = GEDISubsetter(
-                roi           = self.roi,
-                product       = product,
-                selected_vars = self.selected_vars.get(product, []),
-                filters       = self.filters,
-                beams         = self.beams,
-                roi_gdf       = self.roi_gdf,
+                roi=self.roi,
+                product=product,
+                version=self._product_version(product),
+                selected_vars=self.selected_vars.get(product, []),
+                filters=self.filters,
+                beams=self.beams,
+                roi_gdf=self.roi_gdf,
             )
 
             gdf = subsetter.subset_to_gdf(product_h5)
@@ -320,7 +417,7 @@ class GEDIPipeline:
         - L2B: mismo nombre cambiando el shortname
         - L4A: nombre diferente — buscar en disco o descargar via CMR
         """
-        basename    = os.path.basename(base_h5_path)
+        basename = os.path.basename(base_h5_path)
         ref_product = self.products[0]
 
         if product == ref_product:
@@ -363,7 +460,7 @@ class GEDIPipeline:
 
         # L2B y otros: nombre casi idéntico al L2A — solo cambiar shortname
         target_basename = basename.replace(ref_product, product)
-        target_path     = os.path.join(self.out_directory, target_basename)
+        target_path = os.path.join(self.out_directory, target_basename)
 
         if os.path.exists(target_path):
             return target_path
@@ -371,9 +468,40 @@ class GEDIPipeline:
         print(f"[Pipeline] Downloading {product} granule: {target_basename}")
         target_url = self._derive_url(target_basename, product)
         if target_url and self._download(target_url):
-            return target_path
+            return os.path.join(self.out_directory, target_url.split('/')[-1])
 
         print(f"[Pipeline] Warning: could not obtain {product} for this granule")
+        return None
+
+    def _temporal_from_filename(self, filename):
+        parts = filename.replace('.h5', '').split('_')
+        datetime_field = parts[2] if len(parts) > 2 else ''
+        if len(datetime_field) < 7:
+            return None
+        try:
+            import datetime
+            year = int(datetime_field[:4])
+            doy = int(datetime_field[4:7])
+            dt = datetime.datetime(year, 1, 1) + datetime.timedelta(days=doy - 1)
+            date_start = dt.strftime('%Y-%m-%dT00:00:00Z')
+            date_end = (dt + datetime.timedelta(days=1)).strftime('%Y-%m-%dT00:00:00Z')
+            return f"{date_start},{date_end}"
+        except Exception:
+            return None
+
+    def _entry_h5_url(self, entries_list, orbit_num=None, strict=True):
+        for entry in entries_list:
+            title = (entry.get('producer_granule_id', '')
+                     or entry.get('title', ''))
+            if strict and orbit_num and f"O{orbit_num}" not in title:
+                continue
+            for link in entry.get('links', []):
+                href = link.get('href', '')
+                if (href.endswith('.h5')
+                        and href.startswith('https://')
+                        and 's3://' not in href
+                        and 'opendap' not in href):
+                    return href
         return None
 
     def _derive_url(self, filename, product):
@@ -389,26 +517,20 @@ class GEDIPipeline:
 
         # Selector CMR por producto. concept_id para todos los productos.
         # L4C tiene fallback runtime en caso de que ORNL re-ingeste.
-        product_selectors = {
-            'GEDI02_A.002': 'C2142771958-LPCLOUD',
-            'GEDI02_B.002': 'C2142776747-LPCLOUD',
-            'GEDI04_A.002': 'C2237824918-ORNL_CLOUD',
-            'GEDI04_C.002': 'C3049900163-ORNL_CLOUD',
-        }
-        key = f"{product}.{self.version}"
+        # Use finder's unified resolver — covers V002, V003, and runtime fallback.
+        # GEDI04_C is always resolved as .002 (V003 not yet available).
+        from .finder import concept_ids as _finder_concept_ids, _resolve_concept_id
+        _effective_version = self._product_version(product)
+        key = f"{product}.{_effective_version}"
 
-        if key in product_selectors:
-            cmr_selector = f"concept_id={product_selectors[key]}"
-        elif product == 'GEDI04_C':
-            from .finder import _resolve_l4c_concept_id
-            l4c_cid = _resolve_l4c_concept_id(proxies=self._proxies)
-            if not l4c_cid:
-                print(f"[Pipeline] Could not resolve L4C concept_id")
-                return None
-            cmr_selector = f"concept_id={l4c_cid}"
-        else:
-            print(f"[Pipeline] Unknown product key: {key}")
+        _cid = _finder_concept_ids.get(key)
+        if _cid is None:
+            # None means V003 pending — resolve at runtime via DOI
+            _cid = _resolve_concept_id(key, proxies=self._proxies)
+        if not _cid:
+            print(f"[Pipeline] No concept_id available for {key} — cannot derive URL.")
             return None
+        cmr_selector = f"concept_id={_cid}"
 
         # Extraer orbit number del nombre de archivo (ej: O02577)
         # El nombre tiene formato: GEDI02_A_YYYYDDDHHMMSS_OXXXXX_...
@@ -440,6 +562,46 @@ class GEDIPipeline:
                             return href
             except Exception as e:
                 print(f"[Pipeline] CMR search error for {product}: {e}")
+
+            # V003 producer_granule_id can differ by product even when the
+            # orbit/date/tile match. Fall back to temporal + bbox + orbit.
+            try:
+                [ul_lat, ul_lon, lr_lat, lr_lon] = self.roi
+                bbox = f"{ul_lon},{lr_lat},{lr_lon},{ul_lat}"
+                date_str = self._temporal_from_filename(filename)
+                queries = []
+                if date_str:
+                    orbit_param = orbit_num.lstrip('0') if orbit_num else ''
+                    if orbit_param:
+                        queries.append((
+                            "orbit + temporal + bbox",
+                            f"https://cmr.earthdata.nasa.gov/search/granules.json"
+                            f"?{cmr_selector}&temporal={date_str}"
+                            f"&bounding_box={bbox}&orbit_number={orbit_param}"
+                            f"&page_size=50"
+                        ))
+                    queries.append((
+                        "temporal + bbox",
+                        f"https://cmr.earthdata.nasa.gov/search/granules.json"
+                        f"?{cmr_selector}&temporal={date_str}"
+                        f"&bounding_box={bbox}&page_size=200"
+                    ))
+
+                for label, url in queries:
+                    resp = req.get(url, proxies=self._proxies or None,
+                                   timeout=(10, 45))
+                    entries = resp.json().get('feed', {}).get('entry', [])
+                    print(f"[Pipeline] CMR fallback ({product}): "
+                          f"{len(entries)} entries for {label}")
+                    found = self._entry_h5_url(entries, orbit_num, strict=True)
+                    if not found and len(entries) == 1:
+                        found = self._entry_h5_url(entries, orbit_num, strict=False)
+                    if found:
+                        print(f"[Pipeline] Found URL for {product}: {found}")
+                        return found
+            except Exception as e:
+                print(f"[Pipeline] CMR fallback error for {product}: {e}")
+
             print(f"[Pipeline] Could not find URL for {product} / {filename}")
             return None
 
@@ -480,7 +642,9 @@ class GEDIPipeline:
 
         # L4C sub-orbits: no exigir que el título tenga O{orbit}
         # porque el orbit_number en el request CMR ya lo garantiza
-        strict_orbit = (product != 'GEDI04_C')
+        # L4A V003 uses sub-orbits (like L4C) — relaxed orbit matching.
+        # L4A V002 has 1 granule/orbit — strict matching.
+        strict_orbit = not (product == 'GEDI04_C' or (product == 'GEDI04_A' and self._product_version(product) == '003'))  # noqa: E501
 
         try:
             # Búsqueda 1: por bbox + orbit_number (parámetro CMR nativo)
@@ -505,16 +669,16 @@ class GEDIPipeline:
             # El basename contiene YYYYDDD (día juliano) — convertir a fecha ISO
             date_str = None
             try:
-                parts_fn = filename.replace('.h5','').split('_')
+                parts_fn = filename.replace('.h5', '').split('_')
                 datetime_field = parts_fn[2] if len(parts_fn) > 2 else ''
                 if len(datetime_field) >= 7:
                     import datetime
                     year = int(datetime_field[:4])
-                    doy  = int(datetime_field[4:7])
-                    dt   = datetime.datetime(year, 1, 1) + datetime.timedelta(days=doy - 1)
+                    doy = int(datetime_field[4:7])
+                    dt = datetime.datetime(year, 1, 1) + datetime.timedelta(days=doy - 1)
                     date_start = dt.strftime('%Y-%m-%dT00:00:00Z')
-                    date_end   = (dt + datetime.timedelta(days=1)).strftime('%Y-%m-%dT00:00:00Z')
-                    date_str   = f"{date_start},{date_end}"
+                    date_end = (dt + datetime.timedelta(days=1)).strftime('%Y-%m-%dT00:00:00Z')
+                    date_str = f"{date_start},{date_end}"
             except Exception:
                 pass
 
@@ -643,9 +807,9 @@ class GEDIPipeline:
         En outer join, los NaN de productos ausentes no penalizan el shot.
         """
         f = self.filters
-        sens_cfg  = f.get('sensitivity', {})
-        min_sens  = sens_cfg.get('value', 0.90)
-        apply_to  = sens_cfg.get('apply_to', {})
+        sens_cfg = f.get('sensitivity', {})
+        min_sens = sens_cfg.get('value', 0.90)
+        apply_to = sens_cfg.get('apply_to', {})
 
         sens_cols = [c for c in gdf.columns if 'sensitivity' in c.lower()]
         if not sens_cols:
@@ -656,7 +820,7 @@ class GEDIPipeline:
             product = self._product_from_sensitivity_column(col)
             if product and apply_to.get(product, False):
                 has_data = gdf[col].notna()
-                passes   = gdf[col].fillna(min_sens + 1) >= min_sens
+                passes = gdf[col].fillna(min_sens + 1) >= min_sens
                 conditions.append(~has_data | passes)
 
         if not conditions:
@@ -733,12 +897,16 @@ class GEDIPipeline:
     # ── Export ────────────────────────────────────────────────
     def _export(self, gdf: gp.GeoDataFrame, stem: str):
         gdf = self._finalize_output_columns(gdf)
+        if gdf is None or len(gdf) == 0:
+            print(f"[Pipeline] Empty output for {stem} - nothing saved.")
+            return
 
         if self.out_gpkg:
             out_path = os.path.join(self.out_directory, f"{stem}_merged.gpkg")
             try:
                 gdf.to_file(out_path, driver='GPKG')
                 print(f"[Pipeline] Saved GeoPackage: {os.path.basename(out_path)}")
+                self._run_gpkg_outputs.append(out_path)
             except Exception as e:
                 print(f"[Pipeline] Error saving GeoPackage: {e}")
 
@@ -757,21 +925,19 @@ class GEDIPipeline:
         GEDIMetrics_YYYYMMDD_HHMMSS_final.gpkg  (y .parquet si aplica)
         Solo se ejecuta si hay más de un granule procesado.
         """
-        import glob
+        import glob  # noqa: F401
         from datetime import datetime
 
         out_dir = self.out_directory
 
-        # Buscar todos los gpkg de granules individuales
-        granule_gpkgs = sorted(glob.glob(
-            os.path.join(out_dir, '*_merged.gpkg')))
-
-        # Excluir el final si ya existe de una corrida anterior
-        granule_gpkgs = [f for f in granule_gpkgs
-                         if '_final' not in os.path.basename(f)]
+        # Use only files produced in the current run. This avoids merging stale
+        # outputs from earlier runs that happened to use the same output folder.
+        granule_gpkgs = list(getattr(self, '_run_gpkg_outputs', []))
 
         if len(granule_gpkgs) == 0:
-            print("[Pipeline] No granules to merge into final file.")
+            print("[Pipeline] No output files produced. All footprints were "
+                  "removed by filters. Consider relaxing quality, degrade, "
+                  "or surface settings, or using a wider date range.")
             return
 
         if len(granule_gpkgs) == 1:

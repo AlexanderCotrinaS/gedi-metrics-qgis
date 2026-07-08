@@ -167,6 +167,9 @@
               <item row="2" column="0"><widget class="QCheckBox" name="chk_l2a_dem"><property name="text"><string>digital_elevation_model</string></property></widget></item>
               <item row="2" column="1"><widget class="QCheckBox" name="chk_l2a_num_detectedmodes"><property name="text"><string>num_detectedmodes</string></property></widget></item>
               <item row="3" column="0"><widget class="QCheckBox" name="chk_l2a_selected_algorithm"><property name="text"><string>selected_algorithm</string></property></widget></item>
+              <item row="3" column="1"><widget class="QCheckBox" name="chk_l2a_worldcover_class"><property name="text"><string>worldcover_class</string></property></widget></item>
+              <item row="4" column="0"><widget class="QCheckBox" name="chk_l2a_phenology_phase"><property name="text"><string>phenology_phase</string></property></widget></item>
+              <item row="4" column="1"><widget class="QCheckBox" name="chk_l2a_phenology_year"><property name="text"><string>phenology_year</string></property></widget></item>
              </layout>
             </widget>
            </item>
@@ -201,6 +204,14 @@
               <item row="4" column="1"><widget class="QCheckBox" name="chk_l2b_rhog"><property name="text"><string>rhog</string></property></widget></item>
               <item row="5" column="0"><widget class="QCheckBox" name="chk_l2b_sensitivity"><property name="text"><string>sensitivity</string></property><property name="checked"><bool>true</bool></property></widget></item>
               <item row="5" column="1"><widget class="QCheckBox" name="chk_l2b_solar_elevation"><property name="text"><string>solar_elevation</string></property></widget></item>
+              <item row="6" column="0"><widget class="QCheckBox" name="chk_l2b_rch25"><property name="text"><string>rch25</string></property></widget></item>
+              <item row="6" column="1"><widget class="QCheckBox" name="chk_l2b_rch50"><property name="text"><string>rch50</string></property></widget></item>
+              <item row="7" column="0"><widget class="QCheckBox" name="chk_l2b_rch75"><property name="text"><string>rch75</string></property></widget></item>
+              <item row="7" column="1"><widget class="QCheckBox" name="chk_l2b_rch98"><property name="text"><string>rch98</string></property></widget></item>
+              <item row="8" column="0"><widget class="QCheckBox" name="chk_l2b_rch100"><property name="text"><string>rch100</string></property></widget></item>
+              <item row="8" column="1"><widget class="QCheckBox" name="chk_l2b_worldcover_class"><property name="text"><string>worldcover_class</string></property></widget></item>
+              <item row="9" column="0"><widget class="QCheckBox" name="chk_l2b_phenology_phase"><property name="text"><string>phenology_phase</string></property></widget></item>
+              <item row="9" column="1"><widget class="QCheckBox" name="chk_l2b_phenology_year"><property name="text"><string>phenology_year</string></property></widget></item>
              </layout>
             </widget>
            </item>
@@ -327,7 +338,7 @@
         <widget class="QGroupBox" name="grp_degrade">
          <property name="title"><string>Degrade flag</string></property>
          <layout class="QVBoxLayout">
-          <item><widget class="QCheckBox" name="chk_exclude_degrade"><property name="text"><string>Exclude degraded footprints (degrade_flag = 1)</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item><widget class="QCheckBox" name="chk_exclude_degrade"><property name="text"><string>Exclude degraded footprints (degrade_flag ≠ 0)</string></property><property name="checked"><bool>true</bool></property></widget></item>
          </layout>
         </widget>
        </item>
@@ -358,8 +369,8 @@
         <widget class="QGroupBox" name="grp_output_format">
          <property name="title"><string>Output format</string></property>
          <layout class="QVBoxLayout">
-          <item><widget class="QCheckBox" name="chk_out_gpkg"><property name="text"><string>GeoPackage (.gpkg) - for QGIS</string></property><property name="checked"><bool>true</bool></property></widget></item>
-          <item><widget class="QCheckBox" name="chk_out_parquet"><property name="text"><string>GeoParquet (.parquet) - for Python analysis</string></property></widget></item>
+          <item><widget class="QCheckBox" name="chk_out_gpkg"><property name="text"><string>GeoPackage (.gpkg) — GIS-ready format</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item><widget class="QCheckBox" name="chk_out_parquet"><property name="text"><string>GeoParquet (.parquet) — columnar analytics format</string></property></widget></item>
          </layout>
         </widget>
        </item>

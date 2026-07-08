@@ -24,6 +24,7 @@ def add_vendor_paths(plugin_dir):
             sys.path.insert(0, vp)
 
 
+from .compat import exec_dialog
 from .gedi_metrics_dialog import GEDIMetricsDialog
 
 
@@ -31,7 +32,7 @@ class GEDIMetrics:
     """QGIS Plugin Implementation — GEDIMetrics."""
 
     def __init__(self, iface):
-        self.iface      = iface
+        self.iface = iface
         self.plugin_dir = os.path.dirname(__file__)
         add_vendor_paths(self.plugin_dir)
 
@@ -44,8 +45,8 @@ class GEDIMetrics:
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
 
-        self.actions     = []
-        self.menu        = self.tr(u'&GEDIMetrics')
+        self.actions = []
+        self.menu = self.tr(u'&GEDIMetrics')
         self.first_start = None
 
     def tr(self, message):
@@ -55,7 +56,7 @@ class GEDIMetrics:
                    enabled_flag=True, add_to_menu=True,
                    add_to_toolbar=True, status_tip=None,
                    whats_this=None, parent=None):
-        icon   = QIcon(icon_path)
+        icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
         action.triggered.connect(callback)
         action.setEnabled(enabled_flag)
@@ -75,10 +76,10 @@ class GEDIMetrics:
         icon_path = os.path.join(self.plugin_dir, 'icon.png')
         self.add_action(
             icon_path,
-            text       = self.tr(u'GEDIMetrics'),
-            callback   = self.run,
-            status_tip = self.tr(u'Download and merge GEDI products'),
-            parent     = self.iface.mainWindow())
+            text=self.tr(u'GEDIMetrics'),
+            callback=self.run,
+            status_tip=self.tr(u'Download and merge GEDI products'),
+            parent=self.iface.mainWindow())
         self.first_start = True
 
     def unload(self):
@@ -91,4 +92,4 @@ class GEDIMetrics:
             self.first_start = False
             self.dlg = GEDIMetricsDialog(plugin_dir=self.plugin_dir)
         self.dlg.show()
-        self.dlg.exec()
+        exec_dialog(self.dlg)

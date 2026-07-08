@@ -41,6 +41,8 @@ except AttributeError:
 # ── exec_dialog ───────────────────────────────────────────────
 # PyQt5: dlg.exec_()
 # PyQt6: dlg.exec()   (exec_() fue eliminado)
+
+
 def exec_dialog(dlg):
     try:
         return dlg.exec()
@@ -49,6 +51,8 @@ def exec_dialog(dlg):
 
 # ── isdeleted ─────────────────────────────────────────────────
 # Wrapper seguro para sip.isdeleted
+
+
 def is_deleted(obj):
     if sip is None:
         return False

@@ -1,10 +1,11 @@
 
-# Link URL curl --request GET --url 'https://status.earthdata.nasa.gov/api/v1/notifications?client=LP%20DAAC%20Website%20(OPS)&alll=true'
+# Link URL curl --request GET --url 'https://status.earthdata.nasa.gov/api/v1/notifications?client=LP%20DAAC%20Website%20(OPS)&alll=true'  # noqa: E501
 
 import requests
 from bs4 import BeautifulSoup
 
 product_provider_lookup = {}
+
 
 def get_service_status(product):
     """

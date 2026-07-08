@@ -1,5 +1,6 @@
 from datetime import datetime
 
+
 def get_date_from_gedi_fn(granule_name):
     """
     Transforms Julian Date present in the GEDI Filenames by default into
